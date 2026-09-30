@@ -44,16 +44,16 @@ Upload your resume. Pick a target role. Get a personalized, week-by-week AI road
     <td><img src="screenshots/skill-gap.png" alt="Skill gap analysis"/></td>
   </tr>
   <tr>
-    <td align="center"><b>Overview — readiness score & matched skills</b></td>
-    <td align="center"><b>Skill Gap — what you have vs. what you need</b></td>
+    <td align="center"><b>Overview - readiness score & matched skills</b></td>
+    <td align="center"><b>Skill Gap - what you have vs. what you need</b></td>
   </tr>
   <tr>
     <td><img src="screenshots/roadmap.png" alt="Roadmap"/></td>
     <td><img src="screenshots/insights.png" alt="Insights charts"/></td>
   </tr>
   <tr>
-    <td align="center"><b>Roadmap — week-by-week learning plan</b></td>
-    <td align="center"><b>Insights — charts & market data</b></td>
+    <td align="center"><b>Roadmap - week-by-week learning plan</b></td>
+    <td align="center"><b>Insights - charts & market data</b></td>
   </tr>
 </table>
 
