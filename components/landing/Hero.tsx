@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 
@@ -50,12 +50,6 @@ export function Hero({ onStartAnalysis }: HeroProps) {
         </div>
       )}
 
-      {/* Background gradient */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(180deg, var(--accent-light) 0%, transparent 60%)' }}
-      />
-
       {/* Content */}
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
         <motion.div
@@ -64,11 +58,13 @@ export function Hero({ onStartAnalysis }: HeroProps) {
           transition={{ duration: 0.6 }}
         >
           <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-8 border"
-            style={{ background: 'var(--accent-light)', borderColor: 'var(--accent)', color: 'var(--accent)' }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-8"
+            style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            AI-powered career navigation
+            <span
+              style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}
+            />
+            Career navigation
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-primary mb-6 leading-tight">
@@ -85,14 +81,13 @@ export function Hero({ onStartAnalysis }: HeroProps) {
             size="lg"
             onClick={onStartAnalysis}
             className="text-lg px-8 py-4 h-14"
-            style={{ boxShadow: '0 8px 32px color-mix(in srgb, var(--accent) 25%, transparent)' }}
           >
             Analyze my resume
             <ArrowRight className="h-5 w-5" />
           </Button>
 
           <p className="mt-4 text-sm text-muted">
-            No account needed · Works with PDF &amp; DOCX · AI-powered analysis
+            No account needed · Works with PDF &amp; DOCX · Free to use
           </p>
         </motion.div>
       </div>
