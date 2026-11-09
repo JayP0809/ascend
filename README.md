@@ -2,7 +2,7 @@
 
 # 🚀 Ascend
 
-### AI-powered career navigation — from your resume to your dream role
+### AI-powered career navigation: from your resume to your dream role
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
@@ -11,7 +11,7 @@
 ![SQLite](https://img.shields.io/badge/SQLite-local-003b57?style=flat-square&logo=sqlite)
 ![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)
 
-Upload your resume. Pick a target role. Get a personalized, week-by-week AI roadmap with curated resources, hands-on projects, and skill gap analysis — running locally with zero setup.
+Upload your resume. Pick a target role. Get a personalized, week-by-week AI roadmap with curated resources, hands-on projects, and skill gap analysis. Runs locally with zero setup.
 
 ![Landing page](screenshots/landing.png)
 
@@ -21,18 +21,18 @@ Upload your resume. Pick a target role. Get a personalized, week-by-week AI road
 
 ## ✨ Features
 
-- **📄 Resume upload** — drag-and-drop PDF or DOCX, or use the built-in sample resume
-- **🎯 80+ roles** — autocomplete search across 10 industries with salary & demand data
-- **🤖 Live AI analysis** — 4-stage Groq pipeline: skill extraction → role requirements → gap analysis → roadmap generation
+- **📄 Resume upload:** drag-and-drop PDF or DOCX, or use the built-in sample resume
+- **🎯 80+ roles:** autocomplete search across 10 industries with salary & demand data
+- **🤖 Live AI analysis:** 4-stage Groq pipeline: skill extraction, role requirements, gap analysis, roadmap generation
 - **📊 5-tab dashboard:**
-  - **Overview** — readiness gauge, matched skills, key strengths
-  - **Skill Gap** — filterable grid of critical / nice-to-have / transferable skills
-  - **Roadmap** — collapsible week-by-week timeline with resources and projects
-  - **Insights** — 4 charts: projections, market demand, skill radar, role breakdown
-  - **Export** — one-click PDF report, no server required
-- **💬 Community feed** — anonymized activity from other users, trending skills
-- **🌙 Dark / light mode** — instant toggle, zero flicker
-- **🎭 Demo mode** — fully functional with realistic sample data when no API key is set
+  - **Overview:** readiness gauge, matched skills, key strengths
+  - **Skill Gap:** filterable grid of critical / nice-to-have / transferable skills
+  - **Roadmap:** collapsible week-by-week timeline with resources and projects
+  - **Insights:** 4 charts: projections, market demand, skill radar, role breakdown
+  - **Export:** one-click PDF report, no server required
+- **💬 Community feed:** anonymized activity from other users, trending skills
+- **🌙 Dark / light mode:** instant toggle, zero flicker
+- **🎭 Demo mode:** fully functional with realistic sample data when no API key is set
 
 ---
 
@@ -80,7 +80,7 @@ Click **▶ Run Ascend** in the VS Code sidebar, or:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — the app works immediately in demo mode, no API key needed.
+Open [http://localhost:3000](http://localhost:3000). The app works immediately in demo mode, no API key needed.
 
 ---
 
@@ -94,7 +94,7 @@ By default Ascend runs in **demo mode** with realistic pre-generated data. To an
    ```
    GROQ_API_KEY=gsk_your_key_here
    ```
-4. Restart the app — live mode activates automatically
+4. Restart the app. Live mode activates automatically.
 
 ---
 
@@ -104,9 +104,9 @@ By default Ascend runs in **demo mode** with realistic pre-generated data. To an
 |---|---|
 | **Framework** | Next.js 15 (App Router) + TypeScript |
 | **Styling** | Tailwind CSS + CSS custom properties |
-| **AI** | Groq API — `llama-3.3-70b-versatile` |
+| **AI** | Groq API (`openai/gpt-oss-20b`) |
 | **Database** | SQLite via `better-sqlite3` (auto-created, no setup) |
-| **Charts** | Recharts — 5 chart types |
+| **Charts** | Recharts - 5 chart types |
 | **Animations** | Framer Motion |
 | **Resume parsing** | `pdf-parse` + `mammoth` |
 | **PDF export** | `jsPDF` + `jspdf-autotable` |
@@ -129,11 +129,11 @@ ascend/
 │       ├── export/            ← Analysis data for PDF export
 │       └── community/         ← Anonymized community feed
 ├── components/
-│   ├── ui/                    ← Button, Card, Badge, Dialog, Tabs…
-│   ├── charts/                ← ReadinessGauge, SkillGapChart…
+│   ├── ui/                    ← Button, Card, Badge, Dialog, Tabs...
+│   ├── charts/                ← ReadinessGauge, SkillGapChart...
 │   ├── landing/               ← Hero, RoleSampleCards
 │   ├── upload/                ← ResumeDropzone, RoleSearch, AnalysisLoader
-│   ├── dashboard/             ← DashboardTabs, OverviewTab, RoadmapTab…
+│   ├── dashboard/             ← DashboardTabs, OverviewTab, RoadmapTab...
 │   └── shared/                ← Navbar, ThemeToggle
 ├── lib/
 │   ├── ai.ts                  ← Groq pipeline + demo mode fallback
@@ -180,16 +180,16 @@ Built as a portfolio piece showcasing production-grade full-stack engineering:
 | **Next.js 15 App Router** | Server components, API routes, dynamic routing |
 | **TypeScript** | Strict mode, zero `any`, full type coverage |
 | **AI integration** | Groq API with 4-stage sequential prompt pipeline |
-| **Data visualization** | Recharts — radial gauge, area, bar, pie charts |
+| **Data visualization** | Recharts - radial gauge, area, bar, pie charts |
 | **Theming** | CSS custom properties + `next-themes` + Tailwind dark mode |
 | **SQLite** | Auto-created DB, WAL mode, typed sync API, no ORM |
 | **Resume parsing** | PDF via `pdf-parse`, DOCX via `mammoth` |
-| **Animations** | Framer Motion — AnimatePresence, staggered effects |
-| **PDF export** | Client-side `jsPDF` — no server required |
+| **Animations** | Framer Motion - AnimatePresence, staggered effects |
+| **PDF export** | Client-side `jsPDF`, no server required |
 | **Demo mode** | Full realistic dataset when no API key is configured |
 
 ---
 
 ## 📄 License
 
-MIT — free to use, fork, and deploy.
+MIT - free to use, fork, and deploy.

@@ -19,14 +19,14 @@ function importanceBadge(importance: SkillGapItem['importance']) {
     critical: { variant: 'danger', label: 'Critical' },
     'nice-to-have': { variant: 'warning', label: 'Nice to have' },
     transferable: { variant: 'accent', label: 'Transferable' },
-    has: { variant: 'success', label: 'You have it' },
+    has: { variant: 'accent', label: 'You have it' },
   } as const;
   const { variant, label } = map[importance];
   return <Badge variant={variant}>{label}</Badge>;
 }
 
 function DemandIcon({ trend }: { trend: SkillGapItem['demandTrend'] }) {
-  if (trend === 'up') return <TrendingUp className="h-3 w-3 text-[var(--success)]" />;
+  if (trend === 'up') return <TrendingUp className="h-3 w-3 text-accent" />;
   if (trend === 'down') return <TrendingDown className="h-3 w-3 text-[var(--danger)]" />;
   return <Minus className="h-3 w-3 text-muted" />;
 }
