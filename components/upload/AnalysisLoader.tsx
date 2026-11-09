@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const STEPS = [
@@ -17,6 +17,7 @@ interface AnalysisLoaderProps {
 
 export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     let stepIndex = 0;
@@ -25,7 +26,6 @@ export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) 
       setCurrentStep(stepIndex);
       if (stepIndex >= STEPS.length - 1) {
         clearInterval(interval);
-        // Poll for completion
         pollForResult();
       }
     }, 1200);
@@ -46,12 +46,23 @@ export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) 
           // keep polling
         }
       }
-      // Timeout fallback
-      onComplete({ analysisId });
+      setTimedOut(true);
     }
 
     return () => clearInterval(interval);
   }, [analysisId, onComplete]);
+
+  if (timedOut) {
+    return (
+      <div className="py-8 px-4 text-center">
+        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4" style={{ background: 'var(--accent-light)' }}>
+          <AlertTriangle className="h-8 w-8" style={{ color: 'var(--accent)' }} />
+        </div>
+        <h3 className="text-lg font-semibold text-primary mb-2">Analysis timed out</h3>
+        <p className="text-sm text-secondary">The AI took too long to respond. Check your Groq API key in <code>.env.local</code> and try again.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="py-8 px-4">

@@ -55,7 +55,6 @@ export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: 
     if (!selectedRole) return;
     setError(null);
     setLoading(true);
-    onAnalysisStart();
 
     try {
       const res = await fetch('/api/analyze', {
