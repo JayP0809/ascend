@@ -12,7 +12,7 @@ async function callGroq(prompt: string): Promise<string> {
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
   const completion = await client.chat.completions.create({
-    model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile',
+    model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.3,
     max_tokens: 4096,
