@@ -108,17 +108,15 @@ function buildDistributionData(items: SkillGapItem[]): { name: string; value: nu
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
   return [
-    { name: 'Technical', value: Math.round((counts.technical / total) * 100), color: '#6366f1' },
-    { name: 'Soft Skills', value: Math.round((counts.soft / total) * 100), color: '#10b981' },
-    { name: 'Tools', value: Math.round((counts.tools / total) * 100), color: '#f59e0b' },
-    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#ef4444' },
+    { name: 'Technical', value: Math.round((counts.technical / total) * 100), color: '#E07A5F' },
+    { name: 'Soft Skills', value: Math.round((counts.soft / total) * 100), color: '#9B9490' },
+    { name: 'Tools', value: Math.round((counts.tools / total) * 100), color: '#C2622B' },
+    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#6B6560' },
   ].filter((d) => d.value > 0);
 }
 
 export function getReadinessColor(score: number): string {
-  if (score >= 75) return 'var(--success)';
-  if (score >= 50) return 'var(--warning)';
-  return 'var(--danger)';
+  return 'var(--accent)';
 }
 
 export function getReadinessLabel(score: number): string {

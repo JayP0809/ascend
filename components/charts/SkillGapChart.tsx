@@ -45,16 +45,16 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export function SkillGapChart({ categories, currentSkills }: SkillGapChartProps) {
   const { theme } = useTheme();
-  const [colors, setColors] = useState({ text: '#64748b', grid: '#334155', success: '#10b981', accent: '#6366f1' });
+  const [colors, setColors] = useState({ text: '#9B9490', grid: '#2E2A26', muted: '#4A3D35', accent: '#E07A5F' });
 
   useEffect(() => {
     const root = document.documentElement;
     const style = getComputedStyle(root);
     setColors({
-      text: style.getPropertyValue('--text-muted').trim() || '#64748b',
-      grid: style.getPropertyValue('--border').trim() || '#334155',
-      success: style.getPropertyValue('--success').trim() || '#10b981',
-      accent: style.getPropertyValue('--accent').trim() || '#6366f1',
+      text: style.getPropertyValue('--text-muted').trim() || '#9B9490',
+      grid: style.getPropertyValue('--border').trim() || '#2E2A26',
+      muted: style.getPropertyValue('--border').trim() || '#4A3D35',
+      accent: style.getPropertyValue('--accent').trim() || '#E07A5F',
     });
   }, [theme]);
 
@@ -68,8 +68,8 @@ export function SkillGapChart({ categories, currentSkills }: SkillGapChartProps)
         <YAxis tick={{ fontSize: 11, fill: colors.text }} axisLine={false} tickLine={false} />
         <Tooltip content={<CustomTooltip />} />
         <Legend wrapperStyle={{ fontSize: 11, color: colors.text }} />
-        <Bar dataKey="you" name="You have" fill={colors.success} radius={[4, 4, 0, 0]} animationDuration={800} />
-        <Bar dataKey="required" name="Role requires" fill={colors.accent} radius={[4, 4, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="you" name="You have" fill={colors.accent} radius={[4, 4, 0, 0]} animationDuration={800} />
+        <Bar dataKey="required" name="Role requires" fill={colors.muted} radius={[4, 4, 0, 0]} animationDuration={1000} />
       </BarChart>
     </ResponsiveContainer>
   );

@@ -9,16 +9,9 @@ interface ReadinessGaugeProps {
   targetRole: string;
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 75) return 'var(--success)';
-  if (score >= 50) return 'var(--warning)';
-  return 'var(--danger)';
-}
-
 export function ReadinessGauge({ score, targetRole }: ReadinessGaugeProps) {
   const { theme } = useTheme();
   const [animatedScore, setAnimatedScore] = useState(0);
-  const color = getScoreColor(score);
 
   useEffect(() => {
     const duration = 1200;
@@ -38,8 +31,8 @@ export function ReadinessGauge({ score, targetRole }: ReadinessGaugeProps) {
   }, [score]);
 
   const data = [
-    { value: animatedScore, fill: color },
-    { value: 100 - animatedScore, fill: theme === 'dark' ? '#1e293b' : '#f1f5f9' },
+    { value: animatedScore, fill: 'var(--accent)' },
+    { value: 100 - animatedScore, fill: theme === 'dark' ? '#2E2A26' : '#EDE9E5' },
   ];
 
   return (
