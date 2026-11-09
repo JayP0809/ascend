@@ -95,7 +95,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const result: AnalysisResult = JSON.parse(record.result_json);
     if (!result.skillExtraction) {
-      // Analysis is still pending (POST not yet complete) — tell the poller to keep waiting
+      // Analysis is still pending (POST not yet complete) - tell the poller to keep waiting
       return NextResponse.json({ pending: true }, { status: 202 });
     }
     const dashboard = buildDashboardData(result);

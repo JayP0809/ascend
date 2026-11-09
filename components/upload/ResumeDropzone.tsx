@@ -105,7 +105,7 @@ export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
               <Upload className="h-6 w-6 text-accent" />
             </div>
             <p className="text-sm font-medium text-primary mb-1">
-              Drop your resume here — PDF or DOCX
+              Drop your resume here - PDF or DOCX
             </p>
             <p className="text-xs text-muted">or click to browse</p>
           </>

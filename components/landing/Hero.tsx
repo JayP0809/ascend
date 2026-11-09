@@ -11,7 +11,7 @@ const FLOATING_TAGS = [
   'JavaScript', 'Machine Learning', 'Data Analysis', 'Project Management',
 ];
 
-// Pre-computed deterministic values — no Math.random() to avoid hydration mismatch
+// Pre-computed deterministic values - no Math.random() to avoid hydration mismatch
 const TAG_CONFIG = FLOATING_TAGS.map((tag, i) => ({
   label: tag,
   left: `${5 + ((i * 4.1) % 88)}%`,
@@ -30,7 +30,7 @@ export function Hero({ onStartAnalysis }: HeroProps) {
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
-      {/* Floating skill tags — only after mount to avoid hydration issues */}
+      {/* Floating skill tags - only after mount to avoid hydration issues */}
       {mounted && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
           {TAG_CONFIG.map((tag, i) => (

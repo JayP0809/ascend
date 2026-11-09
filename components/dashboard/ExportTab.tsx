@@ -240,7 +240,7 @@ export function ExportTab({ data }: ExportTabProps) {
       </div>
 
       <p className="text-center text-xs text-muted">
-        The PDF is generated locally in your browser — no data is sent to any server.
+        The PDF is generated locally in your browser. No data is sent to any server.
       </p>
     </div>
   );

@@ -233,7 +233,7 @@ export function getDemoData(analysisId: string = DEMO_ANALYSIS_ID, targetRole = 
       readiness_score: 67,
       strengths_summary:
         'Your programming background in Python, JavaScript, and SQL translates directly to scripting and automation tasks. Git proficiency and Agile experience are core DevOps skills you already have.',
-      biggest_gap: 'Container orchestration with Docker and Kubernetes — the backbone of modern DevOps workflows.',
+      biggest_gap: 'Container orchestration with Docker and Kubernetes, the backbone of modern DevOps workflows.',
     },
     roadmap: [
       {

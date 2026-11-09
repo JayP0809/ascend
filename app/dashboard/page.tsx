@@ -114,7 +114,7 @@ function DashboardContent() {
         <div className="bg-[var(--warning)] bg-opacity-15 border-b border-[var(--warning)] border-opacity-20">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-primary">
-              <span className="font-semibold">Demo mode</span> — Showing sample data for a Software Engineer → DevOps Engineer transition.{' '}
+              <span className="font-semibold">Demo mode</span> - Showing sample data for a Software Engineer to DevOps Engineer transition.{' '}
               <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 Add your Groq API key
               </a>{' '}

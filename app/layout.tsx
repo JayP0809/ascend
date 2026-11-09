@@ -6,7 +6,7 @@ import '@/styles/globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Ascend — AI Career Navigation',
+  title: 'Ascend - AI Career Navigation',
   description: 'Upload your resume. Pick a role. Get your personalized AI-powered career roadmap.',
   keywords: ['career', 'AI', 'resume', 'roadmap', 'job', 'skills'],
 };

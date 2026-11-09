@@ -75,7 +75,7 @@ function buildProgressionData(startScore: number, totalWeeks: number): { week: n
   const increment = (targetScore - startScore) / totalWeeks;
 
   for (let w = 1; w <= totalWeeks; w++) {
-    // Deterministic "noise" using week number — no Math.random() for SSR safety
+    // Deterministic "noise" using week number - no Math.random() for SSR safety
     const noise = ((w * 7) % 5) - 2;
     const readiness = Math.min(100, Math.max(startScore, Math.round(startScore + increment * w + noise)));
     data.push({ week: w, readiness });
