@@ -1,5 +1,6 @@
 import {
   pgTable,
+  primaryKey,
   text,
   integer,
   real,
@@ -126,11 +127,33 @@ export const aiUsage = pgTable('ai_usage', {
 ]);
 
 // ---------------------------------------------------------------------------
+// usage_buckets
+// Atomic quota reservation. One row per (user_id, bucket_key) where
+// bucket_key is the month string "YYYY-MM". A single atomic SQL statement
+// increments the count or refuses if count >= limit — prevents concurrent
+// requests from bypassing the quota.
+// ---------------------------------------------------------------------------
+export const usageBuckets = pgTable('usage_buckets', {
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  bucketKey: text('bucket_key').notNull(),   // 'YYYY-MM' e.g. '2026-11'
+  count:     integer('count').notNull().default(0),
+  limitVal:  integer('limit_val').notNull().default(5),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.bucketKey], name: 'usage_buckets_pk' }),
+  index('usage_buckets_user_id_idx').on(t.userId),
+]);
+
+// ---------------------------------------------------------------------------
 // Relations (for Drizzle query builder joins)
 // ---------------------------------------------------------------------------
 export const usersRelations = relations(users, ({ many }) => ({
-  analyses: many(analyses),
-  aiUsage:  many(aiUsage),
+  analyses:     many(analyses),
+  aiUsage:      many(aiUsage),
+  usageBuckets: many(usageBuckets),
+}));
+
+export const usageBucketsRelations = relations(usageBuckets, ({ one }) => ({
+  user: one(users, { fields: [usageBuckets.userId], references: [users.id] }),
 }));
 
 export const analysesRelations = relations(analyses, ({ one, many }) => ({

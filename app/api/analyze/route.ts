@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
-import { getCurrentUser } from '@/lib/auth';
-import { checkQuota } from '@/lib/quota';
+import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
+import { reserveQuotaSlot } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,38 +30,63 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const { analysisId, targetRole, jobDescription } = parsed.data;
+    const isDemoFlow = !isLiveMode() || !!analysisId?.startsWith('demo-');
 
-    const isDemoFlow = !isLiveMode() || analysisId?.startsWith('demo-');
+    // Demo flows bypass all authentication and quota checks.
+    if (isDemoFlow) {
+      const result = getDemoData(analysisId || uuidv4(), targetRole);
+      const dashboard = buildDashboardData(result);
+      await saveAnalysis(
+        result.analysisId,
+        result.skillExtraction.current_skills.join(', '),
+        targetRole,
+        jobDescription ?? null,
+        result.gapAnalysis.readiness_score,
+        JSON.stringify(result),
+        { isDemoMode: true }
+      );
+      return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
+    }
 
-    // Quota check — only enforced for live (non-demo) flows
-    if (!isDemoFlow) {
-      const user = await getCurrentUser(request);
-      const quota = await checkQuota(user?.userId ?? null, isDemoFlow);
-      if (!quota.allowed) {
+    // Live flow requires a session when Clerk is configured OR fail-closed in production.
+    // DEV_BYPASS_ACTIVE = Clerk absent + non-production: skip auth for local dev.
+    const user = await getCurrentUser(request);
+
+    if (!DEV_BYPASS_ACTIVE && !user) {
+      // Misconfigured production (CLERK not configured) is handled by the 503 path:
+      if (!CLERK_CONFIGURED && process.env.NODE_ENV === 'production') {
         return NextResponse.json(
-          { error: quota.message ?? 'Monthly analysis quota exceeded.' },
-          { status: 429 }
+          { error: 'Authentication service is not configured. Contact the site administrator.' },
+          { status: 503 }
         );
       }
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in to run an analysis.' },
+        { status: 401 }
+      );
     }
 
-    let result: AnalysisResult;
-
-    if (isDemoFlow) {
-      const newId = analysisId || uuidv4();
-      result = getDemoData(newId, targetRole);
-    } else {
-      if (!analysisId) {
-        return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
-      }
-      const existing = await getAnalysis(analysisId);
-      if (!existing) {
-        return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
-      }
-
-      result = await runAnalysis(analysisId, existing.resume_text, targetRole, jobDescription);
+    // Atomically reserve a quota slot before touching Groq.
+    // If Groq subsequently fails, the slot is consumed intentionally —
+    // this prevents indefinite retries from bypassing per-user limits.
+    const quota = await reserveQuotaSlot(user?.userId ?? null, false);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        { error: quota.message ?? 'Monthly analysis quota exceeded.' },
+        { status: 429 }
+      );
     }
 
+    if (!analysisId) {
+      return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
+    }
+
+    const existing = await getAnalysis(analysisId);
+    if (!existing) {
+      return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
+    }
+
+    const result = await runAnalysis(analysisId, existing.resume_text, targetRole, jobDescription);
     const dashboard = buildDashboardData(result);
 
     await saveAnalysis(
@@ -71,19 +96,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       jobDescription ?? null,
       result.gapAnalysis.readiness_score,
       JSON.stringify(result),
-      { isDemoMode: result.isDemoMode }
+      { isDemoMode: false, userId: user?.userId }
     );
 
-    // Save anonymized community entry (non-critical)
+    // Anonymized community entry — fire and forget
     const topGap = result.gapAnalysis.missing_critical[0] || 'N/A';
     saveCommunityEntry(uuidv4(), targetRole, result.gapAnalysis.readiness_score, topGap, result.analysisId)
       .catch(() => { /* non-fatal */ });
 
-    return NextResponse.json({
-      analysisId: result.analysisId,
-      dashboard,
-      isDemoMode: result.isDemoMode,
-    });
+    return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: false });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Analysis failed' },
@@ -100,6 +121,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis ID required' }, { status: 400 });
   }
 
+  // Demo IDs are served from in-memory data — no DB lookup, no auth required.
   if (id.startsWith('demo-')) {
     const result = getDemoData(id);
     return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(result), isDemoMode: true });
@@ -108,6 +130,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const record = await getAnalysis(id);
   if (!record) {
     return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
+  }
+
+  const user = await getCurrentUser(request);
+  const access = checkAnalysisAccess(record, user);
+  if (!access.granted) {
+    return NextResponse.json({ error: access.message }, { status: access.status });
   }
 
   try {

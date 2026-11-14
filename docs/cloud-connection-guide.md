@@ -15,11 +15,13 @@ All steps below require your explicit approval before execution.
 | DB client (graceful fallback) | Done | `lib/db-client.ts` |
 | All DB operations (async) | Done | `lib/db.ts` |
 | Auth stub (Clerk-ready) | Done | `lib/auth.ts` |
-| Quota enforcement (5/month) | Done | `lib/quota.ts` |
-| All API routes updated | Done | `app/api/*/route.ts` |
+| Clerk middleware (conditional) | Done | `middleware.ts` |
+| Quota enforcement (5/month, atomic) | Done | `lib/quota.ts` |
+| IDOR ownership checks | Done | `app/api/analyze/route.ts`, `app/api/export/route.ts` |
+| Upload user binding | Done | `app/api/upload/route.ts` |
 | npm scripts: db:generate/migrate/push/studio | Done | `package.json` |
 
-The app builds and all 40 tests pass without a database or Clerk connection.
+The app builds and all 55 tests pass without a database or Clerk connection.
 Demo mode is fully functional without any external services.
 
 ---

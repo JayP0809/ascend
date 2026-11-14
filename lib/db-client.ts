@@ -1,37 +1,35 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+/**
+ * Database connection factory.
+ *
+ * Uses @neondatabase/serverless with the HTTP transport so this works
+ * in Vercel's serverless functions without persistent TCP connections.
+ * Each request opens a lightweight HTTPS connection to Neon — no
+ * connection pool state survives between invocations, which is exactly
+ * what serverless requires.
+ *
+ * Returns null when DATABASE_URL is not set. All callers must handle
+ * null gracefully — demo mode runs entirely without a database.
+ */
+import { neon } from '@neondatabase/serverless';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-export type DbClient = ReturnType<typeof drizzle<typeof schema>>;
+export type DbClient = ReturnType<typeof drizzleNeon<typeof schema>>;
 
 let _client: DbClient | null = null;
-let _attempted = false;
 
-/**
- * Returns a Drizzle db instance when DATABASE_URL is configured.
- * Returns null when DATABASE_URL is absent — callers must handle this case
- * (demo mode stays functional without a database connection).
- */
 export function getDbClient(): DbClient | null {
-  if (_attempted) return _client;
-  _attempted = true;
+  if (_client !== null) return _client;
 
   const url = process.env.DATABASE_URL;
-  if (!url) {
-    return null;
-  }
+  if (!url) return null;
 
   try {
-    const sql = postgres(url, {
-      max: 10,
-      idle_timeout: 20,
-      connect_timeout: 10,
-      ssl: url.includes('neon.tech') ? 'require' : undefined,
-    });
-    _client = drizzle(sql, { schema });
+    const sql = neon(url);
+    _client = drizzleNeon(sql, { schema });
     return _client;
   } catch (err) {
-    console.error('[db-client] Failed to initialize database connection:', err);
+    console.error('[db-client] Failed to initialize Neon connection:', err);
     return null;
   }
 }

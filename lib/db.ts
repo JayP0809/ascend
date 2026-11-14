@@ -61,7 +61,7 @@ export async function saveAnalysis(
 
 export async function getAnalysis(
   id: string
-): Promise<{ id: string; result_json: string; target_role: string; resume_text: string } | null> {
+): Promise<{ id: string; result_json: string; target_role: string; resume_text: string; user_id: string | null } | null> {
   const db = getDbClient();
   if (!db) return null;
 
@@ -71,6 +71,7 @@ export async function getAnalysis(
       result_json: analyses.resultJson,
       target_role: analyses.targetRole,
       resume_text: analyses.resumeText,
+      user_id:     analyses.userId,
     })
     .from(analyses)
     .where(eq(analyses.id, id))

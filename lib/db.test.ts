@@ -101,20 +101,20 @@ describe('db schema — column name constants', () => {
 
 describe('quota — pure logic', () => {
   it('demo flows are always allowed regardless of count', async () => {
-    const { checkQuota } = await import('./quota');
-    const status = await checkQuota(null, true);
+    const { reserveQuotaSlot } = await import('./quota');
+    const status = await reserveQuotaSlot(null, true);
     expect(status.allowed).toBe(true);
   });
 
   it('null userId (unauthenticated) is always allowed', async () => {
-    const { checkQuota } = await import('./quota');
-    const status = await checkQuota(null, false);
+    const { reserveQuotaSlot } = await import('./quota');
+    const status = await reserveQuotaSlot(null, false);
     expect(status.allowed).toBe(true);
   });
 
   it('reports correct limit constant', async () => {
-    const { checkQuota, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const status = await checkQuota(null);
+    const { getQuotaStatus, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
+    const status = await getQuotaStatus(null);
     expect(status.limit).toBe(MONTHLY_ANALYSIS_QUOTA);
   });
 });
