@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Area, AreaChart,
 } from 'recharts';
 import { useTheme } from 'next-themes';
@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   );
 };
 
-export function ProjectionLineChart({ data, startScore }: ProjectionLineChartProps) {
+export function ProjectionLineChart({ data, startScore: _startScore }: ProjectionLineChartProps) {
   const { theme } = useTheme();
   const [colors, setColors] = useState({ text: '#64748b', grid: '#334155', accent: '#6366f1' });
 

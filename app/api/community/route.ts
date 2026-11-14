@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+// Fixed base time — offsets are relative to a stable anchor, not Date.now(),
+// so server and client produce identical timestamps (no SSR hydration mismatch).
+// These are illustrative sample entries, not real user data.
+const DEMO_BASE_MS = new Date('2025-11-13T12:00:00.000Z').getTime();
+
 const DEMO_COMMUNITY = [
-  { id: '1', target_role: 'DevOps Engineer', readiness_score: 67, top_gap: 'Docker', created_at: new Date(Date.now() - 5 * 60000).toISOString() },
-  { id: '2', target_role: 'Data Scientist', readiness_score: 72, top_gap: 'Machine Learning', created_at: new Date(Date.now() - 12 * 60000).toISOString() },
-  { id: '3', target_role: 'Product Manager', readiness_score: 81, top_gap: 'Product Strategy', created_at: new Date(Date.now() - 18 * 60000).toISOString() },
-  { id: '4', target_role: 'Cloud Architect', readiness_score: 55, top_gap: 'Kubernetes', created_at: new Date(Date.now() - 25 * 60000).toISOString() },
-  { id: '5', target_role: 'ML Engineer', readiness_score: 63, top_gap: 'PyTorch', created_at: new Date(Date.now() - 35 * 60000).toISOString() },
-  { id: '6', target_role: 'UX Designer', readiness_score: 78, top_gap: 'Figma', created_at: new Date(Date.now() - 42 * 60000).toISOString() },
-  { id: '7', target_role: 'Financial Analyst', readiness_score: 85, top_gap: 'Excel Modeling', created_at: new Date(Date.now() - 55 * 60000).toISOString() },
-  { id: '8', target_role: 'Cybersecurity Analyst', readiness_score: 60, top_gap: 'Penetration Testing', created_at: new Date(Date.now() - 68 * 60000).toISOString() },
+  { id: 'demo-1', target_role: 'DevOps Engineer', readiness_score: 67, top_gap: 'Docker', created_at: new Date(DEMO_BASE_MS - 5 * 60000).toISOString() },
+  { id: 'demo-2', target_role: 'Data Scientist', readiness_score: 72, top_gap: 'Machine Learning', created_at: new Date(DEMO_BASE_MS - 12 * 60000).toISOString() },
+  { id: 'demo-3', target_role: 'Product Manager', readiness_score: 81, top_gap: 'Product Strategy', created_at: new Date(DEMO_BASE_MS - 18 * 60000).toISOString() },
+  { id: 'demo-4', target_role: 'Cloud Architect', readiness_score: 55, top_gap: 'Kubernetes', created_at: new Date(DEMO_BASE_MS - 25 * 60000).toISOString() },
+  { id: 'demo-5', target_role: 'ML Engineer', readiness_score: 63, top_gap: 'PyTorch', created_at: new Date(DEMO_BASE_MS - 35 * 60000).toISOString() },
+  { id: 'demo-6', target_role: 'UX Designer', readiness_score: 78, top_gap: 'Figma', created_at: new Date(DEMO_BASE_MS - 42 * 60000).toISOString() },
+  { id: 'demo-7', target_role: 'Financial Analyst', readiness_score: 85, top_gap: 'Excel Modeling', created_at: new Date(DEMO_BASE_MS - 55 * 60000).toISOString() },
+  { id: 'demo-8', target_role: 'Cybersecurity Analyst', readiness_score: 60, top_gap: 'Penetration Testing', created_at: new Date(DEMO_BASE_MS - 68 * 60000).toISOString() },
 ];
 
 const DEMO_TRENDING = [

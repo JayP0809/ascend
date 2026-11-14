@@ -1,18 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
+const analyzeBodySchema = z.object({
+  analysisId: z.string().uuid().optional(),
+  targetRole: z.string().min(1, 'Target role is required').max(200),
+  jobDescription: z.string().max(5000).optional(),
+});
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = await request.json();
-    const { analysisId, targetRole, jobDescription } = body;
-
-    if (!targetRole) {
-      return NextResponse.json({ error: 'Target role is required' }, { status: 400 });
+    const rawBody = await request.json().catch(() => null);
+    if (rawBody === null) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
+
+    const parsed = analyzeBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
+        { status: 400 }
+      );
+    }
+
+    const { analysisId, targetRole, jobDescription } = parsed.data;
 
     // Check if this is a demo flow
     const isDemoFlow = !isLiveMode() || analysisId?.startsWith('demo-');
@@ -24,6 +39,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       result = getDemoData(newId, targetRole);
     } else {
       // Fetch existing resume text
+      if (!analysisId) {
+        return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
+      }
       const existing = db.getAnalysis(analysisId);
       if (!existing) {
         return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });

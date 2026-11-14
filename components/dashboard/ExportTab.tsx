@@ -4,7 +4,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashboardData } from '@/lib/types';
 import { Download, Link2, CheckCircle, FileText, Map, BookOpen, BarChart2 } from 'lucide-react';
-import { getReadinessColor } from '@/lib/scorer';
 
 interface ExportTabProps {
   data: DashboardData;
@@ -38,10 +37,11 @@ export function ExportTab({ data }: ExportTabProps) {
       const autoTable = (await import('jspdf-autotable')).default;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-      const accentColor: [number, number, number] = [99, 102, 241];
-      const textDark: [number, number, number] = [15, 23, 42];
-      const textLight: [number, number, number] = [71, 85, 105];
-      const bgLight: [number, number, number] = [248, 250, 252];
+      // Warm terracotta accent (#E07A5F) matching --accent CSS variable
+      const accentColor: [number, number, number] = [224, 122, 95];
+      const textDark: [number, number, number] = [30, 24, 20];
+      const textLight: [number, number, number] = [110, 97, 90];
+      const bgLight: [number, number, number] = [252, 248, 245];
 
       // Cover page
       doc.setFillColor(...accentColor);

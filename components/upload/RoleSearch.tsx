@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Role } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: RoleSearchProps) {
+export function RoleSearch({ analysisId, onAnalysisStart: _onAnalysisStart, onAnalysisComplete }: RoleSearchProps) {
   const [query, setQuery] = useState('');
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);

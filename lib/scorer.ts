@@ -57,7 +57,7 @@ export function buildDashboardData(analysis: AnalysisResult): DashboardData {
   };
 }
 
-function categorizeSkill(
+export function categorizeSkill(
   skill: string,
   categories: { technical: string[]; soft: string[]; tools: string[]; certifications: string[] }
 ): string {
@@ -69,7 +69,7 @@ function categorizeSkill(
   return 'technical';
 }
 
-function buildProgressionData(startScore: number, totalWeeks: number): { week: number; readiness: number }[] {
+export function buildProgressionData(startScore: number, totalWeeks: number): { week: number; readiness: number }[] {
   const data: { week: number; readiness: number }[] = [{ week: 0, readiness: startScore }];
   const targetScore = Math.min(95, startScore + 30);
   const increment = (targetScore - startScore) / totalWeeks;
@@ -83,7 +83,7 @@ function buildProgressionData(startScore: number, totalWeeks: number): { week: n
   return data;
 }
 
-function buildMarketDemandData(analysis: AnalysisResult): { skill: string; demand: number; hasSkill: boolean }[] {
+export function buildMarketDemandData(analysis: AnalysisResult): { skill: string; demand: number; hasSkill: boolean }[] {
   const allRequired = [
     ...analysis.roleRequirements.required_skills,
     ...analysis.roleRequirements.nice_to_have,
@@ -93,14 +93,14 @@ function buildMarketDemandData(analysis: AnalysisResult): { skill: string; deman
 
   return allRequired.map((skill, i) => ({
     skill: skill.length > 20 ? skill.substring(0, 18) + '…' : skill,
-    demand: Math.max(45, 95 - i * 6 + Math.round((Math.random() - 0.5) * 10)),
+    demand: Math.max(45, 95 - i * 6 + (((skill.charCodeAt(0) + i) * 7) % 11) - 5),
     hasSkill: currentSkillsLower.some(
       (cs) => cs.includes(skill.toLowerCase()) || skill.toLowerCase().includes(cs)
     ),
   }));
 }
 
-function buildDistributionData(items: SkillGapItem[]): { name: string; value: number; color: string }[] {
+export function buildDistributionData(items: SkillGapItem[]): { name: string; value: number; color: string }[] {
   const counts = { technical: 0, soft: 0, tools: 0, certifications: 0 };
   for (const item of items) {
     if (item.category in counts) counts[item.category as keyof typeof counts]++;
@@ -115,7 +115,7 @@ function buildDistributionData(items: SkillGapItem[]): { name: string; value: nu
   ].filter((d) => d.value > 0);
 }
 
-export function getReadinessColor(score: number): string {
+export function getReadinessColor(_score: number): string {
   return 'var(--accent)';
 }
 

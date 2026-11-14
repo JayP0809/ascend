@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const STEPS = [
   'Resume parsed',

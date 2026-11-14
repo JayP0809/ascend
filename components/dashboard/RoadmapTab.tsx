@@ -51,7 +51,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
   const toggleComplete = (i: number) => {
     setCompleted((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
       return next;
     });
   };
@@ -59,7 +59,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
   const toggleExpand = (i: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
       return next;
     });
   };
@@ -111,7 +111,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
         <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
 
         <div className="space-y-4">
-          {filtered.map((phase, i) => {
+          {filtered.map((phase) => {
             const globalIndex = roadmap.indexOf(phase);
             const isDone = completed.has(globalIndex);
             const isCurrent = !isDone && globalIndex === [...Array(roadmap.length).keys()].find((idx) => !completed.has(idx));

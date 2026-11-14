@@ -1,39 +1,188 @@
-import { AnalysisResult, SkillExtraction, RoleRequirements, GapAnalysis, RoadmapWeek } from './types';
+import {
+  AnalysisResult,
+  SkillExtraction,
+  RoleRequirements,
+  GapAnalysis,
+  RoadmapWeek,
+} from './types';
+import {
+  PROMPT_VERSION,
+  SkillExtractionSchema,
+  RoleRequirementsSchema,
+  GapAnalysisSchema,
+  RoadmapResponseSchema,
+} from './ai-schemas';
+import { z } from 'zod';
 
 const DEMO_ANALYSIS_ID = 'demo-analysis-001';
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
 
 export function isLiveMode(): boolean {
   const key = process.env.GROQ_API_KEY;
   return !!key && key !== 'your-groq-key-here' && key.length > 10;
 }
 
-async function callGroq(prompt: string): Promise<string> {
+// ---------------------------------------------------------------------------
+// Usage tracking
+// ---------------------------------------------------------------------------
+export interface GroqUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  // Groq pricing as of late 2025 for openai/gpt-oss-20b (free tier — $0)
+  // Update if model changes. These are fallback estimates for other models.
+  estimatedCostUsd: number;
+}
+
+// Cost per 1M tokens (input / output). Update when models change.
+const MODEL_COSTS: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+  'openai/gpt-oss-20b': { inputPer1M: 0, outputPer1M: 0 }, // free on Groq
+  'llama-3.1-70b-versatile': { inputPer1M: 0.59, outputPer1M: 0.79 },
+  'llama-3.3-70b-versatile': { inputPer1M: 0.59, outputPer1M: 0.79 },
+};
+
+function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const costs = MODEL_COSTS[model];
+  if (!costs) return 0;
+  return (promptTokens * costs.inputPer1M + completionTokens * costs.outputPer1M) / 1_000_000;
+}
+
+// ---------------------------------------------------------------------------
+// Core Groq call with timeout and usage reporting
+// ---------------------------------------------------------------------------
+interface GroqResult {
+  content: string;
+  usage: GroqUsage;
+}
+
+async function callGroqWithUsage(prompt: string): Promise<GroqResult> {
   const Groq = (await import('groq-sdk')).default;
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-  const completion = await client.chat.completions.create({
-    model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
-    max_tokens: 4096,
-  });
+  const start = Date.now();
 
-  return completion.choices[0]?.message?.content ?? '';
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Groq request timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS)
+  );
+
+  const completion = await Promise.race([
+    client.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 4096,
+    }),
+    timeoutPromise,
+  ]);
+
+  const latencyMs = Date.now() - start;
+  const promptTokens = completion.usage?.prompt_tokens ?? 0;
+  const completionTokens = completion.usage?.completion_tokens ?? 0;
+
+  return {
+    content: completion.choices[0]?.message?.content ?? '',
+    usage: {
+      model: MODEL,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+      latencyMs,
+      estimatedCostUsd: estimateCost(MODEL, promptTokens, completionTokens),
+    },
+  };
 }
 
-async function parseJson<T>(raw: string): Promise<T> {
+// ---------------------------------------------------------------------------
+// JSON extraction helper
+// ---------------------------------------------------------------------------
+function extractJson(raw: string): string {
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]) as T;
-    throw new Error('Failed to parse AI response as JSON');
-  }
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  return match ? match[0] : cleaned;
 }
 
-async function extractSkills(resumeText: string): Promise<SkillExtraction> {
-  const prompt = `Analyze this resume and extract information. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
+// ---------------------------------------------------------------------------
+// Validated call with retry
+// Retries up to MAX_RETRIES times on parse or validation failure.
+// Returns parsed data + aggregated usage across all attempts.
+// ---------------------------------------------------------------------------
+async function callAndValidate<T>(
+  prompt: string,
+  schema: z.ZodType<T>,
+  stepName: string
+): Promise<{ data: T; usages: GroqUsage[] }> {
+  const usages: GroqUsage[] = [];
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    const { content, usage } = await callGroqWithUsage(prompt);
+    usages.push(usage);
+
+    const jsonStr = extractJson(content);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      lastError = new Error(`${stepName}: JSON parse failed on attempt ${attempt}: ${e}`);
+      continue;
+    }
+
+    const result = schema.safeParse(parsed);
+    if (result.success) {
+      return { data: result.data, usages };
+    }
+
+    lastError = new Error(
+      `${stepName}: schema validation failed on attempt ${attempt}: ${result.error.issues.map((i) => i.message).join('; ')}`
+    );
+  }
+
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate usage from all pipeline steps
+// ---------------------------------------------------------------------------
+export interface PipelineUsage {
+  promptVersion: string;
+  steps: { name: string; usage: GroqUsage }[];
+  totals: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    latencyMs: number;
+    estimatedCostUsd: number;
+  };
+}
+
+function aggregateUsage(steps: { name: string; usages: GroqUsage[] }[]): PipelineUsage {
+  const flat = steps.flatMap((s) => s.usages.map((u) => ({ name: s.name, usage: u })));
+  const totals = flat.reduce(
+    (acc, { usage }) => ({
+      promptTokens: acc.promptTokens + usage.promptTokens,
+      completionTokens: acc.completionTokens + usage.completionTokens,
+      totalTokens: acc.totalTokens + usage.totalTokens,
+      latencyMs: acc.latencyMs + usage.latencyMs,
+      estimatedCostUsd: acc.estimatedCostUsd + usage.estimatedCostUsd,
+    }),
+    { promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, estimatedCostUsd: 0 }
+  );
+  return { promptVersion: PROMPT_VERSION, steps: flat, totals };
+}
+
+// ---------------------------------------------------------------------------
+// Prompts (versioned via PROMPT_VERSION in ai-schemas.ts)
+// ---------------------------------------------------------------------------
+function skillExtractionPrompt(resumeText: string): string {
+  return `Analyze this resume and extract information. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 Resume:
 ${resumeText}
@@ -46,18 +195,10 @@ Return this exact JSON structure:
   "education": "Bachelor's in Computer Science",
   "top_titles": ["Software Engineer", "Developer"]
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<SkillExtraction>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<SkillExtraction>(retried);
-  }
 }
 
-async function getRoleRequirements(targetRole: string, jobDescription?: string): Promise<RoleRequirements> {
-  const prompt = `What are the requirements for a ${targetRole} role? ${jobDescription ? `Job description: ${jobDescription}` : ''}
+function roleRequirementsPrompt(targetRole: string, jobDescription?: string): string {
+  return `What are the requirements for a ${targetRole} role?${jobDescription ? ` Job description: ${jobDescription}` : ''}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
@@ -73,21 +214,10 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
   "avg_salary": "$120,000",
   "demand_level": "High"
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<RoleRequirements>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<RoleRequirements>(retried);
-  }
 }
 
-async function analyzeGap(
-  currentSkills: string[],
-  roleRequirements: RoleRequirements
-): Promise<GapAnalysis> {
-  const prompt = `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
+function gapAnalysisPrompt(currentSkills: string[], roleRequirements: RoleRequirements): string {
+  return `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 Current skills: ${JSON.stringify(currentSkills)}
 Required skills: ${JSON.stringify(roleRequirements.required_skills)}
@@ -101,21 +231,10 @@ Nice to have: ${JSON.stringify(roleRequirements.nice_to_have)}
   "strengths_summary": "Strong background in...",
   "biggest_gap": "Docker and Kubernetes experience"
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<GapAnalysis>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<GapAnalysis>(retried);
-  }
 }
 
-async function generateRoadmap(
-  gapAnalysis: GapAnalysis,
-  targetRole: string
-): Promise<RoadmapWeek[]> {
-  const prompt = `Create a week-by-week learning roadmap to become a ${targetRole}.
+function roadmapPrompt(gapAnalysis: GapAnalysis, targetRole: string): string {
+  return `Create a week-by-week learning roadmap to become a ${targetRole}.
 Critical gaps to address: ${JSON.stringify(gapAnalysis.missing_critical)}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
@@ -141,16 +260,54 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 }
 
 Create 8 phases covering all critical gaps. Use real resource URLs from YouTube, official docs, or Coursera.`;
+}
 
-  const raw = await callGroq(prompt);
-  try {
-    const result = await parseJson<{ weeks: RoadmapWeek[] }>(raw);
-    return result.weeks;
-  } catch {
-    const retried = await callGroq(prompt);
-    const result = await parseJson<{ weeks: RoadmapWeek[] }>(retried);
-    return result.weeks;
-  }
+// ---------------------------------------------------------------------------
+// Pipeline functions
+// ---------------------------------------------------------------------------
+async function extractSkills(resumeText: string): Promise<{ data: SkillExtraction; usages: GroqUsage[] }> {
+  return callAndValidate(skillExtractionPrompt(resumeText), SkillExtractionSchema, 'extractSkills');
+}
+
+async function getRoleRequirements(
+  targetRole: string,
+  jobDescription?: string
+): Promise<{ data: RoleRequirements; usages: GroqUsage[] }> {
+  return callAndValidate(
+    roleRequirementsPrompt(targetRole, jobDescription),
+    RoleRequirementsSchema,
+    'getRoleRequirements'
+  );
+}
+
+async function analyzeGap(
+  currentSkills: string[],
+  roleRequirements: RoleRequirements
+): Promise<{ data: GapAnalysis; usages: GroqUsage[] }> {
+  return callAndValidate(
+    gapAnalysisPrompt(currentSkills, roleRequirements),
+    GapAnalysisSchema,
+    'analyzeGap'
+  );
+}
+
+async function generateRoadmap(
+  gapAnalysis: GapAnalysis,
+  targetRole: string
+): Promise<{ data: RoadmapWeek[]; usages: GroqUsage[] }> {
+  const { data, usages } = await callAndValidate(
+    roadmapPrompt(gapAnalysis, targetRole),
+    RoadmapResponseSchema,
+    'generateRoadmap'
+  );
+  return { data: data.weeks, usages };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+export interface RunAnalysisResult extends AnalysisResult {
+  pipelineUsage?: PipelineUsage;
 }
 
 export async function runAnalysis(
@@ -158,28 +315,36 @@ export async function runAnalysis(
   resumeText: string,
   targetRole: string,
   jobDescription?: string
-): Promise<AnalysisResult> {
+): Promise<RunAnalysisResult> {
   if (!isLiveMode()) {
     return getDemoData(analysisId, targetRole);
   }
 
-  const [skillExtraction, roleRequirements] = await Promise.all([
+  const [skillResult, roleResult] = await Promise.all([
     extractSkills(resumeText),
     getRoleRequirements(targetRole, jobDescription),
   ]);
 
-  const gapAnalysis = await analyzeGap(skillExtraction.current_skills, roleRequirements);
-  const roadmap = await generateRoadmap(gapAnalysis, targetRole);
+  const gapResult = await analyzeGap(skillResult.data.current_skills, roleResult.data);
+  const roadmapResult = await generateRoadmap(gapResult.data, targetRole);
+
+  const pipelineUsage = aggregateUsage([
+    { name: 'extractSkills', usages: skillResult.usages },
+    { name: 'getRoleRequirements', usages: roleResult.usages },
+    { name: 'analyzeGap', usages: gapResult.usages },
+    { name: 'generateRoadmap', usages: roadmapResult.usages },
+  ]);
 
   return {
     analysisId,
     targetRole,
-    skillExtraction,
-    roleRequirements,
-    gapAnalysis,
-    roadmap,
+    skillExtraction: skillResult.data,
+    roleRequirements: roleResult.data,
+    gapAnalysis: gapResult.data,
+    roadmap: roadmapResult.data,
     isDemoMode: false,
     createdAt: new Date().toISOString(),
+    pipelineUsage,
   };
 }
 
@@ -263,7 +428,7 @@ export function getDemoData(analysisId: string = DEMO_ANALYSIS_ID, targetRole = 
           { title: 'GitHub Actions Documentation', url: 'https://docs.github.com/en/actions', type: 'Docs' },
           { title: 'GitHub Actions Full Course (Fireship)', url: 'https://www.youtube.com/watch?v=R8_veQiYBjI', type: 'Video' },
         ],
-        project: { title: 'Full CI/CD Pipeline', description: 'Build a complete pipeline: code push → lint → test → Docker build → push to registry → deploy.', tech: ['GitHub Actions', 'Docker', 'Jest', 'YAML'], hours: 14 },
+        project: { title: 'Full CI/CD Pipeline', description: 'Build a complete pipeline: code push to lint to test to Docker build to push to registry to deploy.', tech: ['GitHub Actions', 'Docker', 'Jest', 'YAML'], hours: 14 },
         milestone: 'Every commit triggers automated tests and deployment. Can design CI/CD pipelines for any project.',
       },
       {

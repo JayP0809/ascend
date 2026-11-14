@@ -54,7 +54,10 @@ export function InsightsTab({ data }: InsightsTabProps) {
         </Card>
 
         <Card>
-          <h3 className="text-sm font-semibold text-primary mb-4">Top skills demanded in market</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-primary">Top skills demanded in market</h3>
+            <span className="text-[10px] text-muted px-1.5 py-0.5 rounded border border-border">Illustrative</span>
+          </div>
           <MarketDemandBar data={marketDemandData} />
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5 text-xs text-secondary">

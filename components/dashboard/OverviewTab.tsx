@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ReadinessGauge } from '@/components/charts/ReadinessGauge';
 import { SkillGapChart } from '@/components/charts/SkillGapChart';
 import { DashboardData } from '@/lib/types';
