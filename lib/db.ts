@@ -1,157 +1,338 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+/**
+ * Database access layer.
+ *
+ * Wraps Drizzle ORM (PostgreSQL). When DATABASE_URL is not configured,
+ * all write operations are silent no-ops and reads return empty results —
+ * demo mode runs entirely without a database connection.
+ *
+ * The same external interface is preserved so API routes do not change.
+ */
+import { eq, desc, sql, and, gte, count } from 'drizzle-orm';
+import { getDbClient } from './db-client';
+import {
+  analyses,
+  skillRecords,
+  community,
+  aiUsage,
+  users,
+} from './schema';
+import type { PipelineUsage } from './ai';
 
-const DB_PATH = path.join(process.cwd(), 'ascend.db');
+// Re-export for callers that check availability
+export { isDbAvailable } from './db-client';
 
-let _db: Database.Database | null = null;
+// ---------------------------------------------------------------------------
+// Analyses
+// ---------------------------------------------------------------------------
 
-function getDb(): Database.Database {
-  if (_db) return _db;
-  _db = new Database(DB_PATH);
-  _db.pragma('journal_mode = WAL');
-  initSchema(_db);
-  return _db;
+export async function saveAnalysis(
+  id: string,
+  resumeText: string,
+  targetRole: string,
+  jobDescription: string | null,
+  readinessScore: number,
+  resultJson: string,
+  options: { userId?: string; isDemoMode?: boolean } = {}
+): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  await db.insert(analyses).values({
+    id,
+    userId: options.userId ?? null,
+    resumeText,
+    targetRole,
+    jobDescription,
+    readinessScore,
+    resultJson,
+    isDemoMode: options.isDemoMode ?? false,
+  }).onConflictDoUpdate({
+    target: analyses.id,
+    set: {
+      resumeText,
+      targetRole,
+      jobDescription,
+      readinessScore,
+      resultJson,
+      isDemoMode: options.isDemoMode ?? false,
+    },
+  });
 }
 
-function initSchema(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS analyses (
-      id TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL,
-      resume_text TEXT NOT NULL,
-      target_role TEXT NOT NULL,
-      job_description TEXT,
-      readiness_score REAL NOT NULL DEFAULT 0,
-      result_json TEXT NOT NULL
-    );
+export async function getAnalysis(
+  id: string
+): Promise<{ id: string; result_json: string; target_role: string; resume_text: string } | null> {
+  const db = getDbClient();
+  if (!db) return null;
 
-    CREATE TABLE IF NOT EXISTS skill_records (
-      id TEXT NOT NULL,
-      analysis_id TEXT NOT NULL,
-      skill_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      has_skill INTEGER NOT NULL DEFAULT 0,
-      importance TEXT NOT NULL,
-      FOREIGN KEY (analysis_id) REFERENCES analyses(id)
-    );
+  const rows = await db
+    .select({
+      id:          analyses.id,
+      result_json: analyses.resultJson,
+      target_role: analyses.targetRole,
+      resume_text: analyses.resumeText,
+    })
+    .from(analyses)
+    .where(eq(analyses.id, id))
+    .limit(1);
 
-    CREATE TABLE IF NOT EXISTS roadmap_phases (
-      id TEXT NOT NULL,
-      analysis_id TEXT NOT NULL,
-      week_start INTEGER NOT NULL,
-      week_end INTEGER NOT NULL,
-      focus_area TEXT NOT NULL,
-      topics_json TEXT NOT NULL,
-      resources_json TEXT NOT NULL,
-      project_json TEXT NOT NULL,
-      milestone TEXT NOT NULL,
-      FOREIGN KEY (analysis_id) REFERENCES analyses(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS community (
-      id TEXT PRIMARY KEY,
-      target_role TEXT NOT NULL,
-      readiness_score REAL NOT NULL,
-      top_gap TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      is_public INTEGER NOT NULL DEFAULT 1
-    );
-  `);
+  return rows[0] ?? null;
 }
 
+export async function getUserAnalyses(
+  userId: string,
+  limit = 10
+): Promise<Array<{ id: string; target_role: string; readiness_score: number; created_at: Date }>> {
+  const db = getDbClient();
+  if (!db) return [];
+
+  return db
+    .select({
+      id:             analyses.id,
+      target_role:    analyses.targetRole,
+      readiness_score: analyses.readinessScore,
+      created_at:     analyses.createdAt,
+    })
+    .from(analyses)
+    .where(eq(analyses.userId, userId))
+    .orderBy(desc(analyses.createdAt))
+    .limit(limit);
+}
+
+export async function deleteUserAnalyses(userId: string): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  await db.delete(analyses).where(eq(analyses.userId, userId));
+}
+
+// ---------------------------------------------------------------------------
+// Skill records
+// ---------------------------------------------------------------------------
+
+export async function saveSkillRecords(records: Array<{
+  id: string;
+  analysisId: string;
+  skillName: string;
+  category: string;
+  hasSkill: boolean;
+  importance: string;
+}>): Promise<void> {
+  const db = getDbClient();
+  if (!db || records.length === 0) return;
+
+  await db.insert(skillRecords).values(
+    records.map((r) => ({
+      id:         r.id,
+      analysisId: r.analysisId,
+      skillName:  r.skillName,
+      category:   r.category,
+      hasSkill:   r.hasSkill,
+      importance: r.importance,
+    }))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Community
+// ---------------------------------------------------------------------------
+
+export async function saveCommunityEntry(
+  id: string,
+  targetRole: string,
+  readinessScore: number,
+  topGap: string,
+  analysisId?: string
+): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  await db.insert(community).values({
+    id,
+    analysisId: analysisId ?? null,
+    targetRole,
+    readinessScore,
+    topGap,
+    isPublic: true,
+  }).onConflictDoNothing();
+}
+
+export async function getCommunityEntries(
+  limit = 20
+): Promise<Array<{ id: string; target_role: string; readiness_score: number; top_gap: string; created_at: Date }>> {
+  const db = getDbClient();
+  if (!db) return [];
+
+  return db
+    .select({
+      id:              community.id,
+      target_role:     community.targetRole,
+      readiness_score: community.readinessScore,
+      top_gap:         community.topGap,
+      created_at:      community.createdAt,
+    })
+    .from(community)
+    .where(eq(community.isPublic, true))
+    .orderBy(desc(community.createdAt))
+    .limit(limit);
+}
+
+export async function getTrendingSkills(): Promise<Array<{ skill: string; count: number }>> {
+  const db = getDbClient();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      skill: community.topGap,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(community)
+    .where(eq(community.isPublic, true))
+    .groupBy(community.topGap)
+    .orderBy(desc(sql`count(*)`))
+    .limit(8);
+
+  return rows;
+}
+
+export async function getPopularRoles(): Promise<Array<{ role: string; count: number }>> {
+  const db = getDbClient();
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      role:  community.targetRole,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(community)
+    .where(eq(community.isPublic, true))
+    .groupBy(community.targetRole)
+    .orderBy(desc(sql`count(*)`))
+    .limit(10);
+
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// AI usage tracking
+// ---------------------------------------------------------------------------
+
+export async function saveAiUsage(
+  analysisId: string | null,
+  userId: string | null,
+  pipelineUsage: PipelineUsage
+): Promise<void> {
+  const db = getDbClient();
+  if (!db || !pipelineUsage.steps.length) return;
+
+  await db.insert(aiUsage).values(
+    pipelineUsage.steps.map((s) => ({
+      analysisId:       analysisId ?? null,
+      userId:           userId ?? null,
+      step:             s.name,
+      model:            s.usage.model,
+      promptVersion:    pipelineUsage.promptVersion,
+      promptTokens:     s.usage.promptTokens,
+      completionTokens: s.usage.completionTokens,
+      totalTokens:      s.usage.totalTokens,
+      latencyMs:        s.usage.latencyMs,
+      estimatedCostUsd: s.usage.estimatedCostUsd,
+    }))
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+export async function upsertUser(clerkId: string, email: string, name?: string): Promise<string> {
+  const db = getDbClient();
+  if (!db) throw new Error('Database not available');
+
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  if (existing[0]) return existing[0].id;
+
+  const inserted = await db
+    .insert(users)
+    .values({ clerkId, email, name })
+    .returning({ id: users.id });
+
+  return inserted[0].id;
+}
+
+export async function getUserByClerkId(
+  clerkId: string
+): Promise<{ id: string; email: string; name: string | null } | null> {
+  const db = getDbClient();
+  if (!db) return null;
+
+  const rows = await db
+    .select({ id: users.id, email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  // Cascades delete analyses, skill_records, roadmap_phases, ai_usage
+  await db.delete(users).where(eq(users.id, userId));
+}
+
+// ---------------------------------------------------------------------------
+// Quota: count analyses for a user in the current 30-day window
+// ---------------------------------------------------------------------------
+
+export async function countRecentAnalyses(userId: string, since: Date): Promise<number> {
+  const db = getDbClient();
+  if (!db) return 0;
+
+  const rows = await db
+    .select({ value: count() })
+    .from(analyses)
+    .where(
+      and(
+        eq(analyses.userId, userId),
+        gte(analyses.createdAt, since),
+        eq(analyses.isDemoMode, false)
+      )
+    );
+
+  return rows[0]?.value ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy synchronous shim — kept for internal transition period.
+// The old `db` export is replaced by named async functions above.
+// This shim re-exports the same shape for any code that hasn't been updated yet.
+// ---------------------------------------------------------------------------
 export const db = {
-  getDb,
-
-  saveAnalysis(
+  saveAnalysis: (
     id: string,
     resumeText: string,
     targetRole: string,
     jobDescription: string | null,
     readinessScore: number,
     resultJson: string
-  ): void {
-    const database = getDb();
-    const stmt = database.prepare(`
-      INSERT OR REPLACE INTO analyses
-        (id, created_at, resume_text, target_role, job_description, readiness_score, result_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(id, new Date().toISOString(), resumeText, targetRole, jobDescription, readinessScore, resultJson);
-  },
+  ) => saveAnalysis(id, resumeText, targetRole, jobDescription, readinessScore, resultJson),
 
-  getAnalysis(id: string): { id: string; result_json: string; target_role: string; resume_text: string } | undefined {
-    const database = getDb();
-    const stmt = database.prepare('SELECT id, result_json, target_role, resume_text FROM analyses WHERE id = ?');
-    return stmt.get(id) as { id: string; result_json: string; target_role: string; resume_text: string } | undefined;
-  },
+  getAnalysis: (id: string) => getAnalysis(id),
 
-  saveSkillRecords(records: Array<{
-    id: string; analysisId: string; skillName: string;
-    category: string; hasSkill: boolean; importance: string;
-  }>): void {
-    const database = getDb();
-    const stmt = database.prepare(`
-      INSERT INTO skill_records (id, analysis_id, skill_name, category, has_skill, importance)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    const insertMany = database.transaction((rows: typeof records) => {
-      for (const row of rows) {
-        stmt.run(row.id, row.analysisId, row.skillName, row.category, row.hasSkill ? 1 : 0, row.importance);
-      }
-    });
-    insertMany(records);
-  },
+  saveSkillRecords: (records: Parameters<typeof saveSkillRecords>[0]) => saveSkillRecords(records),
 
-  saveCommunityEntry(id: string, targetRole: string, readinessScore: number, topGap: string): void {
-    const database = getDb();
-    const stmt = database.prepare(`
-      INSERT OR REPLACE INTO community (id, target_role, readiness_score, top_gap, created_at, is_public)
-      VALUES (?, ?, ?, ?, ?, 1)
-    `);
-    stmt.run(id, targetRole, readinessScore, topGap, new Date().toISOString());
-  },
+  saveCommunityEntry: (id: string, targetRole: string, readinessScore: number, topGap: string) =>
+    saveCommunityEntry(id, targetRole, readinessScore, topGap),
 
-  getCommunityEntries(limit = 20): Array<{
-    id: string; target_role: string; readiness_score: number;
-    top_gap: string; created_at: string;
-  }> {
-    const database = getDb();
-    const stmt = database.prepare(`
-      SELECT id, target_role, readiness_score, top_gap, created_at
-      FROM community
-      WHERE is_public = 1
-      ORDER BY created_at DESC
-      LIMIT ?
-    `);
-    return stmt.all(limit) as Array<{
-      id: string; target_role: string; readiness_score: number;
-      top_gap: string; created_at: string;
-    }>;
-  },
-
-  getTrendingSkills(): Array<{ skill: string; count: number }> {
-    const database = getDb();
-    const stmt = database.prepare(`
-      SELECT top_gap as skill, COUNT(*) as count
-      FROM community
-      WHERE is_public = 1
-      GROUP BY top_gap
-      ORDER BY count DESC
-      LIMIT 8
-    `);
-    return stmt.all() as Array<{ skill: string; count: number }>;
-  },
-
-  getPopularRoles(): Array<{ role: string; count: number }> {
-    const database = getDb();
-    const stmt = database.prepare(`
-      SELECT target_role as role, COUNT(*) as count
-      FROM community
-      WHERE is_public = 1
-      GROUP BY target_role
-      ORDER BY count DESC
-      LIMIT 10
-    `);
-    return stmt.all() as Array<{ role: string; count: number }>;
-  },
+  getCommunityEntries: (limit?: number) => getCommunityEntries(limit),
+  getTrendingSkills: () => getTrendingSkills(),
+  getPopularRoles: () => getPopularRoles(),
 };

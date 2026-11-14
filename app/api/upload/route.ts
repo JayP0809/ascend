@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { parseResume, truncateText } from '@/lib/parser';
-import { db } from '@/lib/db';
+import { saveAnalysis } from '@/lib/db';
 import { isLiveMode } from '@/lib/ai';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -13,23 +13,21 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
   'text/plain',
-  'application/octet-stream', // some browsers send this for .docx
+  'application/octet-stream',
 ]);
 
-// Magic byte signatures for supported formats
 function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
   if (buffer.length < 4) return false;
 
-  const isPdf = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
-  const isZip = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04; // PK (docx is zip)
-  const isDocLegacy = buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0; // DOC OLE
+  const isPdf      = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  const isZip      = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  const isDocLegacy = buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
 
   if (mimeType === 'application/pdf') return isPdf;
   if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return isZip;
   if (mimeType === 'application/msword') return isDocLegacy || isZip;
-  if (mimeType === 'text/plain') return true; // text has no signature
+  if (mimeType === 'text/plain') return true;
 
-  // For octet-stream, accept pdf or zip (docx)
   return isPdf || isZip || isDocLegacy;
 }
 
@@ -56,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const bytes = await file.arrayBuffer();
+    const bytes  = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const mimeType = file.type || 'application/octet-stream';
 
@@ -92,14 +90,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const analysisId = uuidv4();
-    const truncated = truncateText(resumeText, 8000);
+    const truncated  = truncateText(resumeText, 8000);
 
-    // Save resume text temporarily
-    db.saveAnalysis(analysisId, truncated, '', null, 0, '{}');
+    // Save resume text — empty result_json placeholder, will be filled by /api/analyze
+    await saveAnalysis(analysisId, truncated, '', null, 0, '{}');
 
     return NextResponse.json({
       analysisId,
-      wordCount: truncated.split(/\s+/).length,
+      wordCount:  truncated.split(/\s+/).length,
       isDemoMode: !isLiveMode(),
     });
   } catch (error) {
@@ -111,7 +109,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(): Promise<NextResponse> {
-  // Return demo analysis ID for sample resume flow
-  const demoId = 'demo-sample-001';
-  return NextResponse.json({ analysisId: demoId, isDemoMode: true });
+  return NextResponse.json({ analysisId: 'demo-sample-001', isDemoMode: true });
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { getAnalysis } from '@/lib/db';
 import { getDemoData } from '@/lib/ai';
 import { AnalysisResult } from '@/lib/types';
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (id.startsWith('demo-')) {
     result = getDemoData(id);
   } else {
-    const record = db.getAnalysis(id);
+    const record = await getAnalysis(id);
     if (!record) {
       return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
     }

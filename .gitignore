@@ -37,3 +37,6 @@ next-env.d.ts
 
 # Eval reports (generated, not source-controlled)
 evals/reports/
+
+# Drizzle generated files (keep migrations, ignore studio temp files)
+.drizzle/

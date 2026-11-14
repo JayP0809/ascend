@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/lib/db';
+import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
+import { getCurrentUser } from '@/lib/auth';
+import { checkQuota } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const analyzeBodySchema = z.object({
-  analysisId: z.string().uuid().optional(),
-  targetRole: z.string().min(1, 'Target role is required').max(200),
+  analysisId:     z.string().uuid().optional(),
+  targetRole:     z.string().min(1, 'Target role is required').max(200),
   jobDescription: z.string().max(5000).optional(),
 });
 
@@ -29,8 +31,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const { analysisId, targetRole, jobDescription } = parsed.data;
 
-    // Check if this is a demo flow
     const isDemoFlow = !isLiveMode() || analysisId?.startsWith('demo-');
+
+    // Quota check — only enforced for live (non-demo) flows
+    if (!isDemoFlow) {
+      const user = await getCurrentUser(request);
+      const quota = await checkQuota(user?.userId ?? null, isDemoFlow);
+      if (!quota.allowed) {
+        return NextResponse.json(
+          { error: quota.message ?? 'Monthly analysis quota exceeded.' },
+          { status: 429 }
+        );
+      }
+    }
 
     let result: AnalysisResult;
 
@@ -38,44 +51,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const newId = analysisId || uuidv4();
       result = getDemoData(newId, targetRole);
     } else {
-      // Fetch existing resume text
       if (!analysisId) {
         return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
       }
-      const existing = db.getAnalysis(analysisId);
+      const existing = await getAnalysis(analysisId);
       if (!existing) {
         return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
       }
 
-      const resumeText = existing.resume_text || '';
-
-      result = await runAnalysis(analysisId, resumeText, targetRole, jobDescription);
+      result = await runAnalysis(analysisId, existing.resume_text, targetRole, jobDescription);
     }
 
     const dashboard = buildDashboardData(result);
-    const resultJson = JSON.stringify(result);
 
-    db.saveAnalysis(
+    await saveAnalysis(
       result.analysisId,
       result.skillExtraction.current_skills.join(', '),
       targetRole,
-      jobDescription || null,
+      jobDescription ?? null,
       result.gapAnalysis.readiness_score,
-      resultJson
+      JSON.stringify(result),
+      { isDemoMode: result.isDemoMode }
     );
 
-    // Save to community (anonymized)
+    // Save anonymized community entry (non-critical)
     const topGap = result.gapAnalysis.missing_critical[0] || 'N/A';
-    try {
-      db.saveCommunityEntry(
-        uuidv4(),
-        targetRole,
-        result.gapAnalysis.readiness_score,
-        topGap
-      );
-    } catch {
-      // Non-critical
-    }
+    saveCommunityEntry(uuidv4(), targetRole, result.gapAnalysis.readiness_score, topGap, result.analysisId)
+      .catch(() => { /* non-fatal */ });
 
     return NextResponse.json({
       analysisId: result.analysisId,
@@ -98,14 +100,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis ID required' }, { status: 400 });
   }
 
-  // Check for demo ID
   if (id.startsWith('demo-')) {
     const result = getDemoData(id);
-    const dashboard = buildDashboardData(result);
-    return NextResponse.json({ analysisId: id, dashboard, isDemoMode: true });
+    return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(result), isDemoMode: true });
   }
 
-  const record = db.getAnalysis(id);
+  const record = await getAnalysis(id);
   if (!record) {
     return NextResponse.json({ error: 'Analysis not found' }, { status: 404 });
   }
@@ -113,11 +113,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const result: AnalysisResult = JSON.parse(record.result_json);
     if (!result.skillExtraction) {
-      // Analysis is still pending (POST not yet complete) - tell the poller to keep waiting
       return NextResponse.json({ pending: true }, { status: 202 });
     }
-    const dashboard = buildDashboardData(result);
-    return NextResponse.json({ analysisId: id, dashboard, isDemoMode: result.isDemoMode });
+    return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(result), isDemoMode: result.isDemoMode });
   } catch {
     return NextResponse.json({ pending: true }, { status: 202 });
   }
