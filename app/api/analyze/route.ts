@@ -4,9 +4,18 @@ import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
-import { reserveQuotaSlot } from '@/lib/quota';
+import { reserveQuotaSlot, refundQuotaSlot } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
+
+// ---------------------------------------------------------------------------
+// In-flight dedup guard
+// Prevents double-click / duplicate concurrent submissions from burning two
+// quota slots for the same analysis ID.  In-process only — a module-level
+// Set is sufficient for local dev and a single-process server.  For
+// serverless multi-process environments this would need Upstash Redis.
+// ---------------------------------------------------------------------------
+const inFlightAnalyses = new Set<string>();
 
 const analyzeBodySchema = z.object({
   analysisId:     z.string().uuid().optional(),
@@ -15,84 +24,99 @@ const analyzeBodySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const rawBody = await request.json().catch(() => null);
+  if (rawBody === null) {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const parsed = analyzeBodySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
+      { status: 400 }
+    );
+  }
+
+  const { analysisId, targetRole, jobDescription } = parsed.data;
+  const isDemoFlow = !isLiveMode() || !!analysisId?.startsWith('demo-');
+
+  // Demo flows bypass all authentication, quota, and dedup checks.
+  if (isDemoFlow) {
+    const result = getDemoData(analysisId || uuidv4(), targetRole);
+    const dashboard = buildDashboardData(result);
+    await saveAnalysis(
+      result.analysisId,
+      result.skillExtraction.current_skills.join(', '),
+      targetRole,
+      jobDescription ?? null,
+      result.gapAnalysis.readiness_score,
+      JSON.stringify(result),
+      { isDemoMode: true }
+    );
+    return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
+  }
+
+  // Live flow requires a session when Clerk is configured OR fail-closed in production.
+  const user = await getCurrentUser(request);
+
+  if (!DEV_BYPASS_ACTIVE && !user) {
+    if (!CLERK_CONFIGURED && process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Authentication service is not configured. Contact the site administrator.' },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Authentication required. Please sign in to run an analysis.' },
+      { status: 401 }
+    );
+  }
+
+  if (!analysisId) {
+    return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
+  }
+
+  // Fetch the analysis record BEFORE reserving a quota slot.
+  // A "not found" or "already in-flight" error must not burn quota.
+  const existing = await getAnalysis(analysisId);
+  if (!existing) {
+    return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
+  }
+
+  // Dedup: reject a second concurrent request for the same analysis ID.
+  if (inFlightAnalyses.has(analysisId)) {
+    return NextResponse.json(
+      { error: 'An analysis is already in progress for this resume. Please wait for it to complete.' },
+      { status: 409 }
+    );
+  }
+
+  // Atomically reserve a quota slot.  Admin accounts bypass the monthly limit
+  // but their usage is still tracked.  The slot is REFUNDED (decremented) if
+  // Groq subsequently fails — the user gets no value, so they should not pay
+  // quota.  The slot is NOT refunded when Groq succeeds but a DB write fails
+  // afterward, since the AI tokens were consumed regardless.
+  const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.clerkId);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: quota.message ?? 'Monthly analysis quota exceeded.' },
+      { status: 429 }
+    );
+  }
+
+  if (quota.adminExempt) {
+    console.info('[quota] admin exemption used — slot tracked, limit not enforced');
+  }
+
+  // ── AI pipeline ────────────────────────────────────────────────────────────
+  // Track whether Groq returned a usable result so the catch block knows
+  // whether to refund the quota slot.
+  inFlightAnalyses.add(analysisId);
+  let groqSucceeded = false;
   try {
-    const rawBody = await request.json().catch(() => null);
-    if (rawBody === null) {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    const parsed = analyzeBodySchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? 'Invalid request' },
-        { status: 400 }
-      );
-    }
-
-    const { analysisId, targetRole, jobDescription } = parsed.data;
-    const isDemoFlow = !isLiveMode() || !!analysisId?.startsWith('demo-');
-
-    // Demo flows bypass all authentication and quota checks.
-    if (isDemoFlow) {
-      const result = getDemoData(analysisId || uuidv4(), targetRole);
-      const dashboard = buildDashboardData(result);
-      await saveAnalysis(
-        result.analysisId,
-        result.skillExtraction.current_skills.join(', '),
-        targetRole,
-        jobDescription ?? null,
-        result.gapAnalysis.readiness_score,
-        JSON.stringify(result),
-        { isDemoMode: true }
-      );
-      return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
-    }
-
-    // Live flow requires a session when Clerk is configured OR fail-closed in production.
-    // DEV_BYPASS_ACTIVE = Clerk absent + non-production: skip auth for local dev.
-    const user = await getCurrentUser(request);
-
-    if (!DEV_BYPASS_ACTIVE && !user) {
-      // Misconfigured production (CLERK not configured) is handled by the 503 path:
-      if (!CLERK_CONFIGURED && process.env.NODE_ENV === 'production') {
-        return NextResponse.json(
-          { error: 'Authentication service is not configured. Contact the site administrator.' },
-          { status: 503 }
-        );
-      }
-      return NextResponse.json(
-        { error: 'Authentication required. Please sign in to run an analysis.' },
-        { status: 401 }
-      );
-    }
-
-    // Atomically reserve a quota slot before touching Groq.
-    // Admin accounts (clerkId === ADMIN_CLERK_USER_ID) bypass the monthly
-    // limit but their usage is still tracked. If Groq subsequently fails,
-    // the slot is consumed intentionally — prevents retry abuse.
-    const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.clerkId);
-    if (!quota.allowed) {
-      return NextResponse.json(
-        { error: quota.message ?? 'Monthly analysis quota exceeded.' },
-        { status: 429 }
-      );
-    }
-
-    if (quota.adminExempt) {
-      // Server-side log only — no user-identifying data exposed in response
-      console.info('[quota] admin exemption used — slot tracked, limit not enforced');
-    }
-
-    if (!analysisId) {
-      return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
-    }
-
-    const existing = await getAnalysis(analysisId);
-    if (!existing) {
-      return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
-    }
-
     const result = await runAnalysis(analysisId, existing.resume_text, targetRole, jobDescription);
+    groqSucceeded = true; // past this line: AI tokens were consumed
+
     const dashboard = buildDashboardData(result);
 
     await saveAnalysis(
@@ -111,13 +135,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .catch(() => { /* non-fatal */ });
 
     return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: false });
+
   } catch (error) {
+    // Refund only when Groq never completed successfully.
+    // DB write failures after a successful Groq response do NOT get a refund —
+    // the AI tokens were consumed and the user may retry the DB save.
+    if (!groqSucceeded) {
+      refundQuotaSlot(user?.userId ?? null).catch(() => {});
+    }
+
     if (error instanceof GroqTimeoutError) {
       return NextResponse.json(
         {
           error: error.message,
           retryable: true,
-          hint: 'The AI service took too long to respond. Your quota slot was used. You can try again.',
+          hint: 'The AI service took too long. Your quota slot was refunded — you can try again.',
         },
         { status: 504 }
       );
@@ -144,6 +176,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { error: error instanceof Error ? error.message : 'Analysis failed' },
       { status: 500 }
     );
+  } finally {
+    inFlightAnalyses.delete(analysisId);
   }
 }
 

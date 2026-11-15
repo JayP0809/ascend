@@ -517,6 +517,146 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
   });
 });
 
+// ---------------------------------------------------------------------------
+// 7. Quota refund — reserve-then-refund leaves count unchanged
+// ---------------------------------------------------------------------------
+
+describe('quota refund — pure logic (no DB)', () => {
+  it('refundQuotaSlot is a no-op when userId is null', async () => {
+    const { refundQuotaSlot } = await import('./quota');
+    // Should not throw; nothing to decrement
+    await expect(refundQuotaSlot(null)).resolves.toBeUndefined();
+  });
+
+  it('refundQuotaSlot is a no-op when DATABASE_URL is absent', async () => {
+    if (HAS_DB) return; // DB path is covered by integration tests
+    const { refundQuotaSlot } = await import('./quota');
+    await expect(
+      refundQuotaSlot('aaaaaaaa-0000-0000-0000-000000000001')
+    ).resolves.toBeUndefined();
+  });
+
+  it('refundQuotaSlot accepts optional clerkId without throwing', async () => {
+    if (HAS_DB) return;
+    const { refundQuotaSlot } = await import('./quota');
+    await expect(
+      refundQuotaSlot('aaaaaaaa-0000-0000-0000-000000000001', 'clerk_someuser')
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cycle', () => {
+  let seedUser: (clerkId: string) => Promise<string>;
+
+  beforeAll(async () => {
+    const { neon } = await import('@neondatabase/serverless');
+    const rawUrl = process.env.DATABASE_URL!;
+    const u = new URL(rawUrl);
+    u.hostname = u.hostname.replace('-pooler', '');
+    u.searchParams.delete('channel_binding');
+    const sql = neon(u.toString());
+
+    seedUser = async (clerkId: string): Promise<string> => {
+      const userId = crypto.randomUUID();
+      await sql`
+        INSERT INTO users (id, clerk_id, email)
+        VALUES (${userId}, ${clerkId}, ${clerkId + '@test.local'})
+        ON CONFLICT (clerk_id) DO NOTHING
+      `;
+      return userId;
+    };
+  });
+
+  it('reserve then refund leaves count at 0 (net zero)', async () => {
+    const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
+    const userId = await seedUser(`clerk_refund_netzero_${Date.now()}`);
+
+    const reserved = await reserveQuotaSlot(userId, false);
+    expect(reserved.allowed).toBe(true);
+    expect(reserved.used).toBe(1);
+
+    await refundQuotaSlot(userId);
+
+    const after = await getQuotaStatus(userId);
+    expect(after.used).toBe(0);
+  });
+
+  it('reserve twice, refund once leaves count at 1', async () => {
+    const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
+    const userId = await seedUser(`clerk_refund_partial_${Date.now()}`);
+
+    await reserveQuotaSlot(userId, false);
+    await reserveQuotaSlot(userId, false);
+    await refundQuotaSlot(userId);
+
+    const after = await getQuotaStatus(userId);
+    expect(after.used).toBe(1);
+  });
+
+  it('refunding below zero is clamped to 0 (GREATEST guard)', async () => {
+    const { refundQuotaSlot, getQuotaStatus } = await import('./quota');
+    const userId = await seedUser(`clerk_refund_clamp_${Date.now()}`);
+
+    // No reserve — count starts at 0 (no row). Refund on a non-existent row
+    // must not error and usage must remain 0.
+    await expect(refundQuotaSlot(userId)).resolves.toBeUndefined();
+    const after = await getQuotaStatus(userId);
+    expect(after.used).toBe(0);
+  });
+
+  it('failed analysis (refund) does not consume a permanent slot', async () => {
+    const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
+    const userId = await seedUser(`clerk_refund_failed_${Date.now()}`);
+
+    // Simulate: reserve slot → Groq fails → refund slot. Repeat up to quota.
+    // After all refunds, quota should still be fully available.
+    for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
+      const r = await reserveQuotaSlot(userId, false);
+      expect(r.allowed).toBe(true);
+      await refundQuotaSlot(userId);
+    }
+
+    const status = await getQuotaStatus(userId);
+    expect(status.used).toBe(0);
+    expect(status.allowed).toBe(true);
+  });
+
+  it('successful analysis (no refund) correctly consumes a slot', async () => {
+    const { reserveQuotaSlot, getQuotaStatus } = await import('./quota');
+    const userId = await seedUser(`clerk_norebound_success_${Date.now()}`);
+
+    // Simulate: reserve slot → Groq succeeds → NO refund.
+    const r = await reserveQuotaSlot(userId, false);
+    expect(r.allowed).toBe(true);
+    // No refundQuotaSlot call — simulating a successful analysis.
+
+    const status = await getQuotaStatus(userId);
+    expect(status.used).toBe(1);
+  });
+
+  it('concurrent refunds do not produce negative counts', async () => {
+    const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
+    const userId = await seedUser(`clerk_refund_concurrent_${Date.now()}`);
+
+    // Reserve 3 slots concurrently, then refund all 3 concurrently.
+    await Promise.all([
+      reserveQuotaSlot(userId, false),
+      reserveQuotaSlot(userId, false),
+      reserveQuotaSlot(userId, false),
+    ]);
+
+    await Promise.all([
+      refundQuotaSlot(userId),
+      refundQuotaSlot(userId),
+      refundQuotaSlot(userId),
+    ]);
+
+    const status = await getQuotaStatus(userId);
+    expect(status.used).toBeGreaterThanOrEqual(0); // GREATEST guard: never negative
+    expect(status.used).toBeLessThanOrEqual(3);
+  });
+});
+
 /*
  * [live-auth] Tests that cannot run without a Clerk configuration.
  * Manual verification steps for post-Clerk-setup testing:

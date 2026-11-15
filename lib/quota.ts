@@ -123,6 +123,33 @@ export async function reserveQuotaSlot(
 }
 
 /**
+ * Atomically refunds (decrements) one quota slot for the current calendar month.
+ *
+ * Call this when an analysis fails AFTER a slot was reserved but BEFORE a
+ * completed result is saved — the user got no value, so they may retry
+ * without penalty. Uses GREATEST(..., 0) to prevent negative counts.
+ *
+ * Safe to call concurrently: the UPDATE is atomic at the row level.
+ * Silent no-op when db is absent or userId is null.
+ */
+export async function refundQuotaSlot(
+  userId: string | null,
+  _clerkId?: string | null,
+): Promise<void> {
+  if (!userId) return;
+
+  const db = getDbClient();
+  if (!db) return;
+
+  const bucket = currentMonthBucket();
+  await db.execute(sql`
+    UPDATE usage_buckets
+    SET count = GREATEST(count - 1, 0)
+    WHERE user_id = ${userId}::uuid AND bucket_key = ${bucket}
+  `);
+}
+
+/**
  * Read-only check of current usage (no reservation).
  * Used for displaying quota status to the user.
  */
