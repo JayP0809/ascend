@@ -213,6 +213,138 @@ describe('quota — bypass and pure-logic checks', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. Admin quota exemption
+// ---------------------------------------------------------------------------
+
+describe('admin quota exemption — isAdminUser()', () => {
+  it('returns false when ADMIN_CLERK_USER_ID is not set', async () => {
+    const { isAdminUser } = await import('./auth');
+    // In CI and local dev, ADMIN_CLERK_USER_ID is not set → no admin
+    if (!process.env.ADMIN_CLERK_USER_ID) {
+      expect(isAdminUser('user_any_clerk_id')).toBe(false);
+      expect(isAdminUser(null)).toBe(false);
+      expect(isAdminUser(undefined)).toBe(false);
+    }
+  });
+
+  it('returns false for null or undefined clerkId regardless of env var', async () => {
+    const { isAdminUser } = await import('./auth');
+    expect(isAdminUser(null)).toBe(false);
+    expect(isAdminUser(undefined)).toBe(false);
+    expect(isAdminUser('')).toBe(false);
+  });
+
+  it('never grants admin status based on a fake/guessed clerkId', async () => {
+    const { isAdminUser } = await import('./auth');
+    // Even if someone sends a request with a clerkId that looks admin-like,
+    // it only matches if it exactly equals ADMIN_CLERK_USER_ID from the env.
+    // These are plausible-looking Clerk IDs that must NOT grant admin access.
+    const fakeIds = [
+      'user_admin',
+      'user_ADMIN',
+      'admin',
+      'user_2NNNNNNNNNNNNNNNNNNNNNNfake',
+      '',
+    ];
+    for (const id of fakeIds) {
+      expect(isAdminUser(id)).toBe(false);
+    }
+  });
+
+  it('returns true only when clerkId exactly matches ADMIN_CLERK_USER_ID', async () => {
+    // We test the exact-match logic using process.env manipulation.
+    // This does NOT test with a real Clerk user — it tests the matching logic.
+    const original = process.env.ADMIN_CLERK_USER_ID;
+    try {
+      process.env.ADMIN_CLERK_USER_ID = 'user_2TestAdminExactMatch123';
+      // Must re-import to pick up env change — use direct function call approach
+      const { isAdminUser } = await import('./auth');
+      // Note: isAdminUser reads process.env at call time (not module load time)
+      expect(isAdminUser('user_2TestAdminExactMatch123')).toBe(true);
+      expect(isAdminUser('user_2TestAdminExactMatch124')).toBe(false); // 1 char diff
+      expect(isAdminUser('user_2TestAdminExactMatch')).toBe(false);    // truncated
+    } finally {
+      if (original === undefined) {
+        delete process.env.ADMIN_CLERK_USER_ID;
+      } else {
+        process.env.ADMIN_CLERK_USER_ID = original;
+      }
+    }
+  });
+
+  it('admin exemption does not bypass checkAnalysisAccess ownership check', async () => {
+    // Admin can bypass the QUOTA but cannot access another user's analyses.
+    // The ownership check is in checkAnalysisAccess() and is always enforced.
+    const { checkAnalysisAccess, isAdminUser } = await import('./auth');
+
+    const adminClerkId = 'user_2AdminTestXYZ';
+    const original = process.env.ADMIN_CLERK_USER_ID;
+    try {
+      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
+      expect(isAdminUser(adminClerkId)).toBe(true);
+
+      if (!HAS_CLERK) {
+        // In dev mode, checkAnalysisAccess grants access to all — bypass active.
+        // This test documents that in PRODUCTION (HAS_CLERK=true) the admin
+        // cannot access a record they don't own, even with admin status.
+        // Manual verification required: see [live-auth] section below.
+        return;
+      }
+
+      // With Clerk configured: admin trying to read a record owned by another
+      // user should still get 404.
+      const otherUserId = 'bbbbbbbb-0000-0000-0000-000000000002';
+      const adminDbUserId = 'aaaaaaaa-0000-0000-0000-000000000001';
+      const adminUser = { userId: adminDbUserId, clerkId: adminClerkId, email: 'admin@test.com' };
+      const record = { user_id: otherUserId };
+      const result = checkAnalysisAccess(record, adminUser);
+      expect(result.granted).toBe(false);
+      expect((result as { granted: false; status: number }).status).toBe(404);
+    } finally {
+      if (original === undefined) {
+        delete process.env.ADMIN_CLERK_USER_ID;
+      } else {
+        process.env.ADMIN_CLERK_USER_ID = original;
+      }
+    }
+  });
+
+  it('reserveQuotaSlot returns adminExempt=true for admin when no DB', async () => {
+    const original = process.env.ADMIN_CLERK_USER_ID;
+    try {
+      process.env.ADMIN_CLERK_USER_ID = 'user_2AdminNoDBTest';
+      const { reserveQuotaSlot } = await import('./quota');
+      // No DATABASE_URL in test env — falls back to allowed=true
+      const result = await reserveQuotaSlot(
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        false,
+        'user_2AdminNoDBTest',
+      );
+      expect(result.allowed).toBe(true);
+      // adminExempt is set when admin is detected (regardless of whether DB
+      // actually enforced anything — the flag signals "this was an admin call")
+      expect(result.adminExempt).toBe(true);
+    } finally {
+      if (original === undefined) {
+        delete process.env.ADMIN_CLERK_USER_ID;
+      } else {
+        process.env.ADMIN_CLERK_USER_ID = original;
+      }
+    }
+  });
+
+  it('reserveQuotaSlot returns no adminExempt flag for regular users', async () => {
+    const { reserveQuotaSlot } = await import('./quota');
+    const result = await reserveQuotaSlot(
+      'aaaaaaaa-0000-0000-0000-000000000001',
+      false,
+      'user_2RegularUser',
+    );
+    expect(result.adminExempt).toBeFalsy();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 5. Auth module flags
 // ---------------------------------------------------------------------------
 
@@ -306,6 +438,55 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
     await reserveQuotaSlot(userId, false);
     const status = await getQuotaStatus(userId);
     expect(status.used).toBe(1);
+  });
+
+  it('[admin] can exceed regular quota limit — usage tracked', async () => {
+    const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
+    const adminClerkId = `user_2AdminIntegration${Date.now()}`;
+    const userId = `admin-db-test-${Date.now()}`;
+    const original = process.env.ADMIN_CLERK_USER_ID;
+    try {
+      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
+      // Run MORE than the normal quota limit
+      const extraRequests = MONTHLY_ANALYSIS_QUOTA + 3;
+      for (let i = 0; i < extraRequests; i++) {
+        const r = await reserveQuotaSlot(userId, false, adminClerkId);
+        expect(r.allowed).toBe(true);
+        expect(r.adminExempt).toBe(true);
+      }
+      // Verify usage was tracked
+      const { getQuotaStatus } = await import('./quota');
+      const status = await getQuotaStatus(userId, false, adminClerkId);
+      expect(status.used).toBe(extraRequests);
+      expect(status.adminExempt).toBe(true);
+      expect(status.allowed).toBe(true); // admin is always allowed
+    } finally {
+      if (original === undefined) delete process.env.ADMIN_CLERK_USER_ID;
+      else process.env.ADMIN_CLERK_USER_ID = original;
+    }
+  });
+
+  it('[admin] non-admin user is still denied after quota exhausted', async () => {
+    // Verifies admin exemption does not leak to regular users sharing the system
+    const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
+    const adminClerkId = `user_2AdminIsolation${Date.now()}`;
+    const regularUserId = `regular-${Date.now()}`;
+    const original = process.env.ADMIN_CLERK_USER_ID;
+    try {
+      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
+
+      for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
+        // regular user (different clerkId) exhausts their quota
+        await reserveQuotaSlot(regularUserId, false, 'user_2RegularNotAdmin');
+      }
+
+      const over = await reserveQuotaSlot(regularUserId, false, 'user_2RegularNotAdmin');
+      expect(over.allowed).toBe(false);
+      expect(over.adminExempt).toBeFalsy();
+    } finally {
+      if (original === undefined) delete process.env.ADMIN_CLERK_USER_ID;
+      else process.env.ADMIN_CLERK_USER_ID = original;
+    }
   });
 });
 

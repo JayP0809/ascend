@@ -131,6 +131,47 @@ This opens Drizzle Studio in your browser — a read-only view of the live schem
 
 ---
 
+## Step 5 — Configure your administrator account (optional)
+
+Your account has no monthly analysis limit. To activate this:
+
+### Find your Clerk user ID
+
+After completing Step 2 (Clerk setup) and signing in to your local dev app:
+
+**Option A — Clerk dashboard (most reliable):**
+1. Go to [clerk.com](https://clerk.com) → Your application → **Users**
+2. Click your account row
+3. Copy the **User ID** field — it starts with `user_` (e.g. `user_2NkXYZ...`)
+
+**Option B — Clerk dashboard quick path:**
+1. After signing in locally, go to your Clerk dashboard → **Users** tab
+2. Your user appears immediately after first sign-in
+
+### Set the environment variable
+
+Add to `.env.local`:
+```
+ADMIN_CLERK_USER_ID=user_2NkXYZ...
+```
+
+For Vercel: add `ADMIN_CLERK_USER_ID` in **Settings → Environment Variables**.
+Set scope to **Production** only (or Production + Preview — not Development unless you want it active there too).
+
+### Verify it works
+
+After setting the variable and restarting `npm run dev`:
+- Run more than 5 analyses while signed in as your account
+- Each should succeed; check server logs for `[quota] admin exemption used`
+- Run as a different test account — that account must still hit the limit at 5
+
+**Security notes:**
+- `ADMIN_CLERK_USER_ID` is a server-only env var — it is never sent to the browser
+- The check compares against the Clerk JWT claim (`clerkId` from a verified session), never client-supplied data
+- Admin status bypasses the monthly quota only — it does NOT grant access to other users' analyses
+
+---
+
 ## Environment variables reference
 
 ```
@@ -142,6 +183,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=    # Clerk publishable key
 
 # Optional
 ANALYSIS_QUOTA_PER_MONTH=5            # Monthly analysis limit per user (default: 5)
+ADMIN_CLERK_USER_ID=                  # Your Clerk user ID — bypasses monthly quota
 NEXT_PUBLIC_POSTHOG_KEY=              # PostHog project API key (analytics)
 NEXT_PUBLIC_POSTHOG_HOST=             # PostHog host (https://us.i.posthog.com)
 UPSTASH_REDIS_REST_URL=               # Upstash Redis URL (rate limiting)

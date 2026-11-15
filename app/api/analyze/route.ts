@@ -67,14 +67,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Atomically reserve a quota slot before touching Groq.
-    // If Groq subsequently fails, the slot is consumed intentionally —
-    // this prevents indefinite retries from bypassing per-user limits.
-    const quota = await reserveQuotaSlot(user?.userId ?? null, false);
+    // Admin accounts (clerkId === ADMIN_CLERK_USER_ID) bypass the monthly
+    // limit but their usage is still tracked. If Groq subsequently fails,
+    // the slot is consumed intentionally — prevents retry abuse.
+    const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.clerkId);
     if (!quota.allowed) {
       return NextResponse.json(
         { error: quota.message ?? 'Monthly analysis quota exceeded.' },
         { status: 429 }
       );
+    }
+
+    if (quota.adminExempt) {
+      // Server-side log only — no user-identifying data exposed in response
+      console.info('[quota] admin exemption used — slot tracked, limit not enforced');
     }
 
     if (!analysisId) {

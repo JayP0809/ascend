@@ -39,6 +39,22 @@ export const CLERK_CONFIGURED = !!(
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 );
 
+/**
+ * Returns true if the given Clerk user ID matches the server-side admin
+ * account configured via ADMIN_CLERK_USER_ID.
+ *
+ * ADMIN_CLERK_USER_ID is a server-only env var — never in the client bundle.
+ * The clerkId argument must come from getCurrentUser() (a Clerk-verified JWT),
+ * never from request body, query string, or any client-controlled source.
+ *
+ * Returns false when ADMIN_CLERK_USER_ID is not set (no admin configured).
+ */
+export function isAdminUser(clerkId: string | null | undefined): boolean {
+  const adminId = process.env.ADMIN_CLERK_USER_ID?.trim();
+  if (!adminId || !clerkId) return false;
+  return clerkId === adminId;
+}
+
 /** True only when running in a local development environment without Clerk. */
 export const DEV_BYPASS_ACTIVE =
   !CLERK_CONFIGURED && process.env.NODE_ENV !== 'production';

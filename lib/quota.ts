@@ -16,6 +16,7 @@
 
 import { sql } from 'drizzle-orm';
 import { getDbClient } from './db-client';
+import { isAdminUser } from './auth';
 
 /** Default monthly quota. Override with ANALYSIS_QUOTA_PER_MONTH env var. */
 export const MONTHLY_ANALYSIS_QUOTA = parseInt(
@@ -24,11 +25,13 @@ export const MONTHLY_ANALYSIS_QUOTA = parseInt(
 );
 
 export interface QuotaStatus {
-  allowed:   boolean;
-  used:      number;
-  limit:     number;
-  resetAt:   Date;
-  message?:  string;
+  allowed:      boolean;
+  used:         number;
+  limit:        number;
+  resetAt:      Date;
+  message?:     string;
+  /** True when the slot was reserved without enforcing the monthly limit. */
+  adminExempt?: boolean;
 }
 
 /**
@@ -38,40 +41,61 @@ export interface QuotaStatus {
  * Always returns allowed=true for demo flows (isDemoFlow=true) or when
  * userId is null (unauthenticated — before Clerk is configured).
  *
+ * When clerkId matches ADMIN_CLERK_USER_ID, the slot is tracked but the
+ * monthly limit is not enforced. adminExempt=true is set on the result.
+ * clerkId MUST come from getCurrentUser() — never from client input.
+ *
  * When DATABASE_URL is absent, falls back to in-memory check (always allowed
  * since there is no persistent user to track). This is safe: in-memory
  * quota only matters when a live database is present.
  */
 export async function reserveQuotaSlot(
   userId: string | null,
-  isDemoFlow = false
+  isDemoFlow = false,
+  clerkId?: string | null,
 ): Promise<QuotaStatus> {
   if (isDemoFlow || !userId) {
     return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
   }
 
+  const admin = isAdminUser(clerkId);
+
   const db = getDbClient();
   if (!db) {
-    // No database — local dev without Neon. Allow and log.
     console.warn('[quota] No database available — quota not enforced in local dev mode.');
-    return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
+    return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth(), adminExempt: admin || undefined };
   }
 
   const bucket = currentMonthBucket();
   const limit  = MONTHLY_ANALYSIS_QUOTA;
 
-  // Single atomic statement using INSERT ... ON CONFLICT DO UPDATE:
-  //   - If no row exists yet: INSERT with count=1
+  if (admin) {
+    // Admin path: always increment, never block. No WHERE clause on DO UPDATE.
+    // Usage is tracked so token/cost reporting remains accurate.
+    const result = await db.execute(sql`
+      INSERT INTO usage_buckets (user_id, bucket_key, count, limit_val)
+      VALUES (${userId}::uuid, ${bucket}, 1, ${limit})
+      ON CONFLICT (user_id, bucket_key)
+      DO UPDATE SET count = usage_buckets.count + 1
+      RETURNING count
+    `);
+    const rows = result.rows as Array<{ count: number }>;
+    const used = rows[0]?.count ?? 1;
+    return { allowed: true, used, limit, resetAt: endOfMonth(), adminExempt: true };
+  }
+
+  // Regular user path: atomic INSERT ... ON CONFLICT DO UPDATE with limit guard.
+  //
+  // Single atomic statement:
+  //   - If no row exists: INSERT with count=1
   //   - If row exists AND count < limit: increment count
   //   - If row exists AND count >= limit: DO UPDATE WHERE clause is false →
   //     the update is skipped → RETURNING returns no rows → quota denied
   //
-  // This is safe against concurrent first-requests: two simultaneous inserts
-  // race on the PRIMARY KEY (user_id, bucket_key). One wins the INSERT, the
-  // other hits the conflict and goes through the DO UPDATE path — both get a
-  // valid count returned. The old split UPDATE/INSERT CTE had a bug where the
-  // second concurrent first-request could get 0 rows (insert conflict + no
-  // update match) and be incorrectly denied even when quota remained.
+  // Concurrent first-requests race on the PRIMARY KEY. One wins the INSERT;
+  // the other hits the conflict and executes the DO UPDATE path — both get a
+  // valid count. The old split UPDATE/INSERT CTE incorrectly denied the second
+  // concurrent first-request (DO NOTHING + no UPDATE match = 0 rows).
   const result = await db.execute(sql`
     INSERT INTO usage_buckets (user_id, bucket_key, count, limit_val)
     VALUES (${userId}::uuid, ${bucket}, 1, ${limit})
@@ -84,7 +108,6 @@ export async function reserveQuotaSlot(
   const rows = result.rows as Array<{ count: number }>;
 
   if (rows.length === 0) {
-    // Quota exhausted — could not increment
     const used = await getCurrentUsage(userId, bucket);
     return {
       allowed: false,
@@ -105,26 +128,31 @@ export async function reserveQuotaSlot(
  */
 export async function getQuotaStatus(
   userId: string | null,
-  isDemoFlow = false
+  isDemoFlow = false,
+  clerkId?: string | null,
 ): Promise<QuotaStatus> {
   if (isDemoFlow || !userId) {
     return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
   }
 
+  const admin = isAdminUser(clerkId);
+
   const db = getDbClient();
   if (!db) {
-    return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
+    return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth(), adminExempt: admin || undefined };
   }
 
   const bucket = currentMonthBucket();
   const used = await getCurrentUsage(userId, bucket);
-  const allowed = used < MONTHLY_ANALYSIS_QUOTA;
+  // Admins are always allowed regardless of usage count.
+  const allowed = admin || used < MONTHLY_ANALYSIS_QUOTA;
 
   return {
     allowed,
     used,
-    limit:   MONTHLY_ANALYSIS_QUOTA,
-    resetAt: endOfMonth(),
+    limit:      MONTHLY_ANALYSIS_QUOTA,
+    resetAt:    endOfMonth(),
+    adminExempt: admin || undefined,
     message: allowed ? undefined
       : `You have used all ${MONTHLY_ANALYSIS_QUOTA} of your free analyses this month. Your quota resets on ${formatDate(endOfMonth())}.`,
   };
