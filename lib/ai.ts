@@ -10,7 +10,7 @@ import {
   SkillExtractionSchema,
   RoleRequirementsSchema,
   GapAnalysisSchema,
-  RoadmapResponseSchema,
+  RoadmapBatchSchema,
 } from './ai-schemas';
 import { z } from 'zod';
 
@@ -21,24 +21,27 @@ const DEMO_ANALYSIS_ID = 'demo-analysis-001';
 // ---------------------------------------------------------------------------
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
-// Per-step timeouts.  Roadmap generates 8 detailed phases (~6–8k tokens) so
-// it needs more time than the smaller steps.
+// Per-step timeouts.  Roadmap is generated in 2 sequential batches of 4
+// phases each (~1,800–2,200 tokens per batch), so each batch needs far less
+// wall time than the old single 8-phase call did.
 const TIMEOUT_MS: Record<string, number> = {
-  extractSkills:       25_000,
-  getRoleRequirements: 25_000,
-  analyzeGap:          20_000,
-  generateRoadmap:     60_000,
-  default:             30_000,
+  extractSkills:        25_000,
+  getRoleRequirements:  25_000,
+  analyzeGap:           20_000,
+  roadmapBatch1:        30_000,
+  roadmapBatch2:        30_000,
+  default:              30_000,
 };
 
-// Per-step max_tokens.  Roadmap output exceeds 4096 tokens for 8 phases; the
-// model supports up to 65 536 completion tokens.  Use tighter limits for the
-// smaller steps to reduce latency.
+// Per-step max_tokens.  Each 4-phase batch uses ~1,800–2,200 tokens; 4 096
+// gives 2× headroom without risking the per-request truncation that plagued
+// the original single 8-phase call.
 const MAX_TOKENS: Record<string, number> = {
   extractSkills:       1_024,
   getRoleRequirements: 2_048,
   analyzeGap:          1_024,
-  generateRoadmap:    16_384,
+  roadmapBatch1:       4_096,
+  roadmapBatch2:       4_096,
   default:             4_096,
 };
 
@@ -301,33 +304,101 @@ Nice to have: ${JSON.stringify(roleRequirements.nice_to_have)}
 }`;
 }
 
-function roadmapPrompt(gapAnalysis: GapAnalysis, targetRole: string): string {
-  return `Create a week-by-week learning roadmap to become a ${targetRole}.
-Critical gaps to address: ${JSON.stringify(gapAnalysis.missing_critical)}
+// Week assignments for the two batches.
+// Batch 1: phases 1-4 → weeks 1-2, 3-4, 5-6, 7-8
+// Batch 2: phases 5-8 → weeks 9-10, 11-12, 13-14, 15-16
+const BATCH_WEEK_PAIRS: [number, number][] = [
+  [1, 2], [3, 4], [5, 6], [7, 8],       // batch 1
+  [9, 10], [11, 12], [13, 14], [15, 16], // batch 2
+];
+
+function roadmapBatchPrompt(
+  gapAnalysis: GapAnalysis,
+  targetRole: string,
+  batchIndex: 0 | 1   // 0 = phases 1-4, 1 = phases 5-8
+): string {
+  const pairs = BATCH_WEEK_PAIRS.slice(batchIndex * 4, batchIndex * 4 + 4);
+  const phaseNums = [1, 2, 3, 4].map((n) => n + batchIndex * 4);
+  const weekList = pairs.map(([s, e]) => `${s}-${e}`).join(', ');
+  const context = batchIndex === 0
+    ? 'Focus on foundational skills first.'
+    : 'Build on the foundational phases; cover advanced and integration skills.';
+
+  // Keep descriptions compact: ≤12 words each, 1 resource per phase.
+  // Explicitly name the ONLY valid type values to avoid schema failures.
+  return `Create phases ${phaseNums[0]}-${phaseNums[3]} of an 8-phase learning roadmap for ${targetRole}.
+Skills to cover across the full roadmap: ${JSON.stringify(gapAnalysis.missing_critical)}
+${context}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
   "weeks": [
     {
-      "week_start": 1,
-      "week_end": 2,
-      "focus_area": "Foundation",
-      "topics": ["Topic 1", "Topic 2"],
+      "week_start": ${pairs[0][0]},
+      "week_end": ${pairs[0][1]},
+      "focus_area": "...",
+      "topics": ["topic1", "topic2", "topic3"],
       "resources": [
-        {"title": "Resource Title", "url": "https://example.com", "type": "Video"}
+        {"title": "...", "url": "https://...", "type": "Docs"}
       ],
-      "project": {
-        "title": "Project Name",
-        "description": "Build a...",
-        "tech": ["Python", "Docker"],
-        "hours": 10
-      },
-      "milestone": "You will be able to..."
+      "project": {"title": "...", "description": "...", "tech": ["..."], "hours": 8},
+      "milestone": "..."
     }
   ]
 }
 
-Create 8 phases covering all critical gaps. Use real resource URLs from YouTube, official docs, or Coursera.`;
+Rules:
+- Return exactly 4 phases with these week_start/week_end pairs: ${weekList}
+- resource.type MUST be exactly one of: Video, Docs, Course, Article, Book
+- Use 1-2 resources per phase with real URLs (docs.*, youtube.com, coursera.org, github.com)
+- Keep project.description under 12 words
+- Keep milestone under 15 words`;
+}
+
+// ---------------------------------------------------------------------------
+// Assembly validation
+// Verifies that two 4-phase batches form a coherent 8-phase roadmap.
+// Throws a descriptive Error (not consumed as quota) if anything is wrong.
+// ---------------------------------------------------------------------------
+export class RoadmapAssemblyError extends Error {
+  constructor(detail: string) {
+    super(`Roadmap assembly failed: ${detail}. This is a generation issue — no quota was double-counted.`);
+    this.name = 'RoadmapAssemblyError';
+  }
+}
+
+function assembleBatchedRoadmap(
+  batch1Weeks: RoadmapWeek[],
+  batch2Weeks: RoadmapWeek[]
+): RoadmapWeek[] {
+  if (batch1Weeks.length !== 4) {
+    throw new RoadmapAssemblyError(`batch 1 returned ${batch1Weeks.length} phases, expected 4`);
+  }
+  if (batch2Weeks.length !== 4) {
+    throw new RoadmapAssemblyError(`batch 2 returned ${batch2Weeks.length} phases, expected 4`);
+  }
+
+  const all = [...batch1Weeks, ...batch2Weeks];
+
+  // Verify week continuity: each phase must start immediately after the previous ends.
+  for (let i = 1; i < all.length; i++) {
+    const prev = all[i - 1];
+    const curr = all[i];
+    if (curr.week_start !== prev.week_end + 1) {
+      throw new RoadmapAssemblyError(
+        `week gap between phase ${i} (ends week ${prev.week_end}) and phase ${i + 1} (starts week ${curr.week_start})`
+      );
+    }
+  }
+
+  // Each phase must have week_start < week_end.
+  for (let i = 0; i < all.length; i++) {
+    if (all[i].week_start >= all[i].week_end) {
+      throw new RoadmapAssemblyError(`phase ${i + 1} has week_start (${all[i].week_start}) >= week_end (${all[i].week_end})`);
+    }
+  }
+
+  return all;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,12 +434,34 @@ async function generateRoadmap(
   gapAnalysis: GapAnalysis,
   targetRole: string
 ): Promise<{ data: RoadmapWeek[]; usages: GroqUsage[] }> {
-  const { data, usages } = await callAndValidate(
-    roadmapPrompt(gapAnalysis, targetRole),
-    RoadmapResponseSchema,
-    'generateRoadmap'
+  // Sequential batches: generate phases 1-4 then 5-8.  Sequential (not
+  // parallel) to respect Groq rate limits and avoid concurrent requests.
+  const batch1 = await callAndValidate(
+    roadmapBatchPrompt(gapAnalysis, targetRole, 0),
+    RoadmapBatchSchema,
+    'roadmapBatch1'
   );
-  return { data: data.weeks, usages };
+  const batch2 = await callAndValidate(
+    roadmapBatchPrompt(gapAnalysis, targetRole, 1),
+    RoadmapBatchSchema,
+    'roadmapBatch2'
+  );
+
+  // Fix week ranges to match the prescribed pairs if the model drifted.
+  // We trust phase count and content; we enforce week numbering ourselves
+  // so the assembly check always passes even if the model mis-numbered.
+  const fixWeeks = (weeks: RoadmapWeek[], batchIndex: 0 | 1): RoadmapWeek[] =>
+    weeks.map((w, i) => ({
+      ...w,
+      week_start: BATCH_WEEK_PAIRS[batchIndex * 4 + i][0],
+      week_end:   BATCH_WEEK_PAIRS[batchIndex * 4 + i][1],
+    }));
+
+  const fixed1 = fixWeeks(batch1.data.weeks, 0);
+  const fixed2 = fixWeeks(batch2.data.weeks, 1);
+  const assembled = assembleBatchedRoadmap(fixed1, fixed2);
+
+  return { data: assembled, usages: [...batch1.usages, ...batch2.usages] };
 }
 
 // ---------------------------------------------------------------------------
@@ -397,10 +490,11 @@ export async function runAnalysis(
   const roadmapResult = await generateRoadmap(gapResult.data, targetRole);
 
   const pipelineUsage = aggregateUsage([
-    { name: 'extractSkills', usages: skillResult.usages },
+    { name: 'extractSkills',      usages: skillResult.usages },
     { name: 'getRoleRequirements', usages: roleResult.usages },
-    { name: 'analyzeGap', usages: gapResult.usages },
-    { name: 'generateRoadmap', usages: roadmapResult.usages },
+    { name: 'analyzeGap',         usages: gapResult.usages },
+    // roadmapResult.usages already contains entries from both batch calls
+    { name: 'generateRoadmap',    usages: roadmapResult.usages },
   ]);
 
   return {

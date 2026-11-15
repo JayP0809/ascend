@@ -5,6 +5,7 @@
  * Live integration tests (gated by GROQ_API_KEY) verify the actual model responds.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ResourceSchema, RoadmapBatchSchema } from './ai-schemas';
 
 // ---- mock groq-sdk --------------------------------------------------------
 // vi.mock is hoisted to the top of the file so the factory must reference a
@@ -26,6 +27,7 @@ import {
   isLiveMode,
   GroqTimeoutError,
   GroqTruncationError,
+  RoadmapAssemblyError,
 } from './ai';
 
 // ---------------------------------------------------------------------------
@@ -64,19 +66,22 @@ const VALID_GAP_JSON = JSON.stringify({
   biggest_gap: 'Container orchestration',
 });
 
-const VALID_ROADMAP_JSON = JSON.stringify({
-  weeks: [
-    {
-      week_start: 1,
-      week_end: 2,
-      focus_area: 'Docker Basics',
-      topics: ['Container fundamentals'],
-      resources: [{ title: 'Docker Docs', url: 'https://docs.docker.com', type: 'Docs' }],
-      project: { title: 'Containerize App', description: 'Build a container', tech: ['Docker'], hours: 8 },
-      milestone: 'Can create Docker containers',
-    },
-  ],
-});
+// Batch responses: each needs exactly 4 phases.
+// Week numbers don't need to be exact — fixWeeks() in the pipeline overwrites them.
+function makePhase(n: number) {
+  return {
+    week_start: n * 2 - 1,
+    week_end:   n * 2,
+    focus_area: `Focus ${n}`,
+    topics: [`Topic ${n}`],
+    resources: [{ title: `Resource ${n}`, url: 'https://docs.docker.com', type: 'Docs' }],
+    project: { title: `Project ${n}`, description: `Build thing ${n}`, tech: ['Python'], hours: 8 },
+    milestone: `Milestone ${n}`,
+  };
+}
+
+const VALID_BATCH1_JSON = JSON.stringify({ weeks: [makePhase(1), makePhase(2), makePhase(3), makePhase(4)] });
+const VALID_BATCH2_JSON = JSON.stringify({ weeks: [makePhase(5), makePhase(6), makePhase(7), makePhase(8)] });
 
 // ---------------------------------------------------------------------------
 // Demo mode (no API key)
@@ -174,21 +179,25 @@ describe('successful pipeline', () => {
     vi.clearAllMocks();
   });
 
-  it('runs the full pipeline and returns a valid AnalysisResult', async () => {
-    // The pipeline makes 4 Groq calls: extractSkills, getRoleRequirements
-    // (concurrent), analyzeGap, generateRoadmap.
+  it('runs the full pipeline with 2 roadmap batches and returns 8 phases', async () => {
+    // Pipeline call order:
+    //  1 & 2  — extractSkills + getRoleRequirements (concurrent)
+    //  3      — analyzeGap
+    //  4      — roadmapBatch1 (phases 1-4)
+    //  5      — roadmapBatch2 (phases 5-8)
     mockCreate
-      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
-      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
-      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
-      .mockResolvedValueOnce(makeCompletion(VALID_ROADMAP_JSON));
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))   // 1 extractSkills
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))    // 2 getRoleRequirements
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))     // 3 analyzeGap
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))  // 4 roadmapBatch1
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON)); // 5 roadmapBatch2
 
     const result = await runAnalysis('live-id', 'resume text', 'Software Engineer');
     expect(result.isDemoMode).toBe(false);
     expect(result.analysisId).toBe('live-id');
     expect(result.gapAnalysis.readiness_score).toBe(65);
-    expect(result.roadmap).toHaveLength(1);
-    expect(mockCreate).toHaveBeenCalledTimes(4);
+    expect(result.roadmap).toHaveLength(8);
+    expect(mockCreate).toHaveBeenCalledTimes(5);
   });
 
   it('exhausts retries and throws on persistent schema validation failure', async () => {
@@ -199,6 +208,185 @@ describe('successful pipeline', () => {
     await expect(
       runAnalysis('live-id', 'resume text', 'Software Engineer')
     ).rejects.toThrow(/schema validation failed/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Batched roadmap generation
+// ---------------------------------------------------------------------------
+describe('batched roadmap generation', () => {
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+  });
+
+  it('throws immediately when batch 1 returns truncated output (finish=length)', async () => {
+    // batch 1 fails → should throw GroqTruncationError before batch 2 is attempted
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion('{"incomplete": true', 'length')); // batch 1 truncated
+
+    await expect(
+      runAnalysis('live-id', 'resume text', 'Software Engineer')
+    ).rejects.toBeInstanceOf(GroqTruncationError);
+
+    // batch 2 should NOT be called after batch 1 truncation
+    expect(mockCreate).toHaveBeenCalledTimes(4);
+  });
+
+  it('throws when batch 2 returns truncated output', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))                  // batch 1 ok
+      .mockResolvedValueOnce(makeCompletion('{"incomplete": true', 'length'));   // batch 2 truncated
+
+    await expect(
+      runAnalysis('live-id', 'resume text', 'Software Engineer')
+    ).rejects.toBeInstanceOf(GroqTruncationError);
+
+    expect(mockCreate).toHaveBeenCalledTimes(5);
+  });
+
+  it('rejects a batch with fewer than 4 phases at Zod schema level', async () => {
+    // RoadmapBatchSchema requires exactly 4 phases (.length(4)).
+    // A 2-phase response fails Zod.  callAndValidate retries once on schema
+    // failures (MAX_RETRIES = 1), so the batch gets 2 attempts before the
+    // error propagates.  Assembly is never reached and batch 2 is never called.
+    const shortBatch = JSON.stringify({ weeks: [makePhase(1), makePhase(2)] });
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(shortBatch))  // attempt 1: Zod rejects
+      .mockResolvedValueOnce(makeCompletion(shortBatch)); // attempt 2 (retry): Zod rejects
+
+    await expect(
+      runAnalysis('live-id', 'resume text', 'Software Engineer')
+    ).rejects.toThrow(/schema validation failed/);
+
+    // 3 pipeline steps + 2 attempts at the failing batch = 5 total.
+    // Batch 2 is never called.
+    expect(mockCreate).toHaveBeenCalledTimes(5);
+  });
+
+  it('rejects a batch with more than 4 phases at Zod schema level', async () => {
+    const longBatch = JSON.stringify({
+      weeks: [makePhase(1), makePhase(2), makePhase(3), makePhase(4), makePhase(5)],
+    });
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(longBatch))  // attempt 1
+      .mockResolvedValueOnce(makeCompletion(longBatch)); // attempt 2 (retry)
+
+    await expect(
+      runAnalysis('live-id', 'resume text', 'Software Engineer')
+    ).rejects.toThrow(/schema validation failed/);
+
+    expect(mockCreate).toHaveBeenCalledTimes(5);
+  });
+
+  it('RoadmapAssemblyError message describes the problem clearly', () => {
+    const err = new RoadmapAssemblyError('batch 2 returned 3 phases, expected 4');
+    expect(err.message).toContain('batch 2 returned 3 phases');
+    expect(err.message).toContain('no quota was double-counted');
+    expect(err.name).toBe('RoadmapAssemblyError');
+  });
+
+  it('normalizes resource.type "Documentation" → "Docs" through the full pipeline', async () => {
+    // The model often returns "Documentation" instead of "Docs".  The
+    // normalization transform must map it to "Docs" so the UI color lookup
+    // always hits the RESOURCE_COLORS table without a fallback branch.
+    const batchWithDocumentation = JSON.stringify({
+      weeks: [
+        makePhase(1),
+        makePhase(2),
+        makePhase(3),
+        {
+          ...makePhase(4),
+          resources: [{ title: 'Python Docs', url: 'https://docs.python.org', type: 'Documentation' }],
+        },
+      ],
+    });
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(batchWithDocumentation))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    const result = await runAnalysis('live-id', 'resume text', 'Software Engineer');
+    expect(result.isDemoMode).toBe(false);
+    // Normalized: "Documentation" → "Docs"
+    expect(result.roadmap[3].resources[0].type).toBe('Docs');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schema unit tests (no Groq calls)
+// ---------------------------------------------------------------------------
+describe('ResourceSchema — type normalization', () => {
+  const valid = { title: 'T', url: 'https://example.com', type: '' };
+
+  it.each([
+    // Exact canonical matches (case-insensitive)
+    ['Video',   'Video'],
+    ['Docs',    'Docs'],
+    ['Course',  'Course'],
+    ['Article', 'Article'],
+    ['Book',    'Book'],
+    ['video',   'Video'],  // lowercase canonical
+    ['docs',    'Docs'],
+    // Model alias → canonical
+    ['Documentation', 'Docs'],
+    ['documentation',  'Docs'],
+    ['Tutorial',       'Docs'],
+    ['GitHub',         'Docs'],
+    ['YouTube',        'Video'],
+    ['Lecture',        'Video'],
+    ['Specialization', 'Course'],
+    ['Textbook',       'Book'],
+    ['Blog',           'Article'],
+    ['Paper',          'Article'],
+    // Unrecognized → Article fallback
+    ['unknown-xyz',   'Article'],
+    ['Podcast',       'Article'],
+  ])('normalizes "%s" → "%s"', (input, expected) => {
+    const result = ResourceSchema.safeParse({ ...valid, type: input });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.type).toBe(expected);
+  });
+
+  it('rejects an empty type string', () => {
+    const result = ResourceSchema.safeParse({ ...valid, type: '' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('RoadmapBatchSchema — exact phase count', () => {
+  const makeRaw = (count: number) => ({
+    weeks: Array.from({ length: count }, (_, i) => ({
+      week_start: i * 2 + 1,
+      week_end:   i * 2 + 2,
+      focus_area: `Focus ${i + 1}`,
+      topics: ['topic'],
+      resources: [{ title: 'R', url: 'https://docs.docker.com', type: 'Docs' }],
+      project: { title: 'P', description: 'desc', tech: ['Python'], hours: 8 },
+      milestone: 'done',
+    })),
+  });
+
+  it('accepts exactly 4 phases', () => {
+    expect(RoadmapBatchSchema.safeParse(makeRaw(4)).success).toBe(true);
+  });
+
+  it.each([0, 1, 2, 3, 5, 8])('rejects %i phases', (count) => {
+    expect(RoadmapBatchSchema.safeParse(makeRaw(count)).success).toBe(false);
   });
 });
 

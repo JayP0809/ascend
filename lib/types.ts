@@ -29,10 +29,15 @@ export interface RoadmapPhase {
   milestone: string;
 }
 
+// Canonical resource type labels.  The AI pipeline normalizes model output
+// to this set so the UI's RESOURCE_COLORS lookup always hits.
+export const RESOURCE_TYPES = ['Video', 'Docs', 'Course', 'Article', 'Book'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
 export interface Resource {
   title: string;
   url: string;
-  type: 'Video' | 'Docs' | 'Course' | 'Article' | 'Book';
+  type: ResourceType;
 }
 
 export interface Project {

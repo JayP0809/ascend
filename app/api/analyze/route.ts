@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
-import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError } from '@/lib/ai';
+import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
 import { reserveQuotaSlot } from '@/lib/quota';
@@ -127,6 +127,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           error: 'The AI response was too long and got cut off. Please report this issue.',
           retryable: false,
+        },
+        { status: 500 }
+      );
+    }
+    if (error instanceof RoadmapAssemblyError) {
+      return NextResponse.json(
+        {
+          error: 'Roadmap generation produced an inconsistent result. Please try again.',
+          retryable: true,
         },
         { status: 500 }
       );
