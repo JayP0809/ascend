@@ -20,7 +20,7 @@ const CLERK_CONFIGURED = !!(
 async function MaybeClerkProvider({ children }: { children: React.ReactNode }) {
   if (!CLERK_CONFIGURED) return <>{children}</>;
   const { ClerkProvider } = await import('@clerk/nextjs');
-  return <ClerkProvider>{children}</ClerkProvider>;
+  return <ClerkProvider afterSignOutUrl="/">{children}</ClerkProvider>;
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
