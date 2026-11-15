@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
 
 const FLOATING_TAGS = [
   'Python', 'Docker', 'SQL', 'Leadership', 'React', 'AWS', 'Excel',
@@ -50,13 +49,9 @@ export function Hero({ onStartAnalysis }: HeroProps) {
         </div>
       )}
 
-      {/* Content */}
+      {/* Content — class applied after mount so SSR HTML stays at opacity:1 */}
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        <div className={mounted ? 'animate-fade-up' : ''}>
           <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-8"
             style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
@@ -89,7 +84,7 @@ export function Hero({ onStartAnalysis }: HeroProps) {
           <p className="mt-4 text-sm text-muted">
             No account needed · Works with PDF &amp; DOCX · Free to use
           </p>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
