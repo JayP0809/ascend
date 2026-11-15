@@ -15,7 +15,7 @@
  * constitute end-to-end auth verification.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { checkAnalysisAccess } from './auth';
 import type { AuthUser } from './auth';
 
@@ -310,19 +310,19 @@ describe('admin quota exemption — isAdminUser()', () => {
   });
 
   it('reserveQuotaSlot returns adminExempt=true for admin when no DB', async () => {
+    // This test checks the no-DB fallback path. When DATABASE_URL is set, skip:
+    // the DB path is covered by the [integration] tests below.
+    if (HAS_DB) return;
     const original = process.env.ADMIN_CLERK_USER_ID;
     try {
       process.env.ADMIN_CLERK_USER_ID = 'user_2AdminNoDBTest';
       const { reserveQuotaSlot } = await import('./quota');
-      // No DATABASE_URL in test env — falls back to allowed=true
       const result = await reserveQuotaSlot(
         'aaaaaaaa-0000-0000-0000-000000000001',
         false,
         'user_2AdminNoDBTest',
       );
       expect(result.allowed).toBe(true);
-      // adminExempt is set when admin is detected (regardless of whether DB
-      // actually enforced anything — the flag signals "this was an admin call")
       expect(result.adminExempt).toBe(true);
     } finally {
       if (original === undefined) {
@@ -334,6 +334,9 @@ describe('admin quota exemption — isAdminUser()', () => {
   });
 
   it('reserveQuotaSlot returns no adminExempt flag for regular users', async () => {
+    // No-DB fallback path only. When DATABASE_URL is set, skip:
+    // the DB path is covered by the [integration] tests below.
+    if (HAS_DB) return;
     const { reserveQuotaSlot } = await import('./quota');
     const result = await reserveQuotaSlot(
       'aaaaaaaa-0000-0000-0000-000000000001',
@@ -385,6 +388,33 @@ describe('auth — CLERK_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation', () => {
+  // usage_buckets.user_id references users.id (FK). We need real user rows
+  // before inserting quota entries. Each test gets its own UUID so they are
+  // fully isolated and can run in any order.
+  //
+  // We seed test users directly via the Neon HTTP client so there is no
+  // dependency on the Clerk sign-in flow.
+  let seedUser: (clerkId: string) => Promise<string>;
+
+  beforeAll(async () => {
+    const { neon } = await import('@neondatabase/serverless');
+    const rawUrl = process.env.DATABASE_URL!;
+    const u = new URL(rawUrl);
+    u.hostname = u.hostname.replace('-pooler', '');
+    u.searchParams.delete('channel_binding');
+    const sql = neon(u.toString());
+
+    seedUser = async (clerkId: string): Promise<string> => {
+      const userId = crypto.randomUUID();
+      await sql`
+        INSERT INTO users (id, clerk_id, email)
+        VALUES (${userId}, ${clerkId}, ${clerkId + '@test.local'})
+        ON CONFLICT (clerk_id) DO NOTHING
+      `;
+      return userId;
+    };
+  });
+
   it('concurrent first-requests all succeed (race condition regression)', async () => {
     // Verifies the INSERT ... ON CONFLICT DO UPDATE fix. The previous CTE used
     // a split UPDATE / INSERT ... ON CONFLICT DO NOTHING pattern where two
@@ -393,7 +423,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
     // conflict, resulting in both being denied. This test would have failed
     // against the old implementation.
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = `concurrent-test-${Date.now()}`;
+    const userId = await seedUser(`clerk_concurrent_${Date.now()}`);
     const concurrency = Math.min(MONTHLY_ANALYSIS_QUOTA, 5);
 
     const results = await Promise.all(
@@ -406,7 +436,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('request beyond quota limit is denied', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = `exhaust-test-${Date.now()}`;
+    const userId = await seedUser(`clerk_exhaust_${Date.now()}`);
 
     for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
       await reserveQuotaSlot(userId, false);
@@ -420,7 +450,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('demo bypass works even after quota is exhausted', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = `demo-bypass-${Date.now()}`;
+    const userId = await seedUser(`clerk_demobp_${Date.now()}`);
 
     for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
       await reserveQuotaSlot(userId, false);
@@ -433,7 +463,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('getQuotaStatus reflects current usage without reserving a slot', async () => {
     const { reserveQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = `status-test-${Date.now()}`;
+    const userId = await seedUser(`clerk_status_${Date.now()}`);
 
     await reserveQuotaSlot(userId, false);
     const status = await getQuotaStatus(userId);
@@ -443,23 +473,21 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
   it('[admin] can exceed regular quota limit — usage tracked', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
     const adminClerkId = `user_2AdminIntegration${Date.now()}`;
-    const userId = `admin-db-test-${Date.now()}`;
+    const userId = await seedUser(adminClerkId);
     const original = process.env.ADMIN_CLERK_USER_ID;
     try {
       process.env.ADMIN_CLERK_USER_ID = adminClerkId;
-      // Run MORE than the normal quota limit
       const extraRequests = MONTHLY_ANALYSIS_QUOTA + 3;
       for (let i = 0; i < extraRequests; i++) {
         const r = await reserveQuotaSlot(userId, false, adminClerkId);
         expect(r.allowed).toBe(true);
         expect(r.adminExempt).toBe(true);
       }
-      // Verify usage was tracked
       const { getQuotaStatus } = await import('./quota');
       const status = await getQuotaStatus(userId, false, adminClerkId);
       expect(status.used).toBe(extraRequests);
       expect(status.adminExempt).toBe(true);
-      expect(status.allowed).toBe(true); // admin is always allowed
+      expect(status.allowed).toBe(true);
     } finally {
       if (original === undefined) delete process.env.ADMIN_CLERK_USER_ID;
       else process.env.ADMIN_CLERK_USER_ID = original;
@@ -467,20 +495,19 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
   });
 
   it('[admin] non-admin user is still denied after quota exhausted', async () => {
-    // Verifies admin exemption does not leak to regular users sharing the system
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
     const adminClerkId = `user_2AdminIsolation${Date.now()}`;
-    const regularUserId = `regular-${Date.now()}`;
+    const regularClerkId = `user_2RegularNotAdmin${Date.now()}`;
+    const regularUserId = await seedUser(regularClerkId);
     const original = process.env.ADMIN_CLERK_USER_ID;
     try {
       process.env.ADMIN_CLERK_USER_ID = adminClerkId;
 
       for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
-        // regular user (different clerkId) exhausts their quota
-        await reserveQuotaSlot(regularUserId, false, 'user_2RegularNotAdmin');
+        await reserveQuotaSlot(regularUserId, false, regularClerkId);
       }
 
-      const over = await reserveQuotaSlot(regularUserId, false, 'user_2RegularNotAdmin');
+      const over = await reserveQuotaSlot(regularUserId, false, regularClerkId);
       expect(over.allowed).toBe(false);
       expect(over.adminExempt).toBeFalsy();
     } finally {

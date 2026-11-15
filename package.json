@@ -15,7 +15,7 @@
     "eval": "npx tsx evals/runner.ts",
     "eval:live": "RUN_EVALS=true npx tsx evals/runner.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },

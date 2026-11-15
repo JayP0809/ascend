@@ -124,7 +124,9 @@ describe('quota — pure logic', () => {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!HAS_DB)('[integration] db — live PostgreSQL', () => {
-  const testId = `test-${Date.now()}`;
+  // Use valid UUIDs — Neon's analyses.id and community.id are UUID columns.
+  // userId is null so no FK constraint on users.id is needed.
+  const testId = crypto.randomUUID();
 
   it('saves and retrieves an analysis round-trip', async () => {
     const payload = JSON.stringify({ skillExtraction: { current_skills: ['Python'] } });
@@ -141,7 +143,7 @@ describe.skipIf(!HAS_DB)('[integration] db — live PostgreSQL', () => {
 
   it('getCommunityEntries returns rows after insert', async () => {
     const { saveCommunityEntry } = await import('./db');
-    const entryId = `community-test-${Date.now()}`;
+    const entryId = crypto.randomUUID();
     await saveCommunityEntry(entryId, 'Software Engineer', 72, 'Docker');
 
     const entries = await getCommunityEntries(50);
@@ -151,7 +153,9 @@ describe.skipIf(!HAS_DB)('[integration] db — live PostgreSQL', () => {
   });
 
   it('countRecentAnalyses returns 0 for a user with no analyses', async () => {
-    const count = await countRecentAnalyses('nonexistent-user-id', new Date());
-    expect(count).toBe(0);
+    // Use a valid UUID that is guaranteed not to exist in the users table.
+    const nonexistentUserId = '00000000-ffff-ffff-ffff-000000000000';
+    const result = await countRecentAnalyses(nonexistentUserId, new Date());
+    expect(result).toBe(0);
   });
 });
