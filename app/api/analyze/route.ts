@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
-import { runAnalysis, getDemoData, isLiveMode } from '@/lib/ai';
+import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
 import { reserveQuotaSlot } from '@/lib/quota';
@@ -112,6 +112,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: false });
   } catch (error) {
+    if (error instanceof GroqTimeoutError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          retryable: true,
+          hint: 'The AI service took too long to respond. Your quota slot was used. You can try again.',
+        },
+        { status: 504 }
+      );
+    }
+    if (error instanceof GroqTruncationError) {
+      return NextResponse.json(
+        {
+          error: 'The AI response was too long and got cut off. Please report this issue.',
+          retryable: false,
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Analysis failed' },
       { status: 500 }

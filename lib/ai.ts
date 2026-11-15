@@ -20,8 +20,31 @@ const DEMO_ANALYSIS_ID = 'demo-analysis-001';
 // Configuration
 // ---------------------------------------------------------------------------
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
-const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_RETRIES = 2;
+
+// Per-step timeouts.  Roadmap generates 8 detailed phases (~6–8k tokens) so
+// it needs more time than the smaller steps.
+const TIMEOUT_MS: Record<string, number> = {
+  extractSkills:       25_000,
+  getRoleRequirements: 25_000,
+  analyzeGap:          20_000,
+  generateRoadmap:     60_000,
+  default:             30_000,
+};
+
+// Per-step max_tokens.  Roadmap output exceeds 4096 tokens for 8 phases; the
+// model supports up to 65 536 completion tokens.  Use tighter limits for the
+// smaller steps to reduce latency.
+const MAX_TOKENS: Record<string, number> = {
+  extractSkills:       1_024,
+  getRoleRequirements: 2_048,
+  analyzeGap:          1_024,
+  generateRoadmap:    16_384,
+  default:             4_096,
+};
+
+// Only retry on parse / validation failures — NOT on timeout or token-limit
+// truncation, which will recur on the same prompt.
+const MAX_RETRIES = 1;
 
 export function isLiveMode(): boolean {
   const key = process.env.GROQ_API_KEY;
@@ -61,43 +84,80 @@ function estimateCost(model: string, promptTokens: number, completionTokens: num
 interface GroqResult {
   content: string;
   usage: GroqUsage;
+  finishReason: string | null;
 }
 
-async function callGroqWithUsage(prompt: string): Promise<GroqResult> {
+export class GroqTimeoutError extends Error {
+  constructor(stepName: string, timeoutMs: number) {
+    super(`AI step "${stepName}" timed out after ${timeoutMs / 1000}s. Please try again.`);
+    this.name = 'GroqTimeoutError';
+  }
+}
+
+export class GroqTruncationError extends Error {
+  constructor(stepName: string) {
+    super(
+      `AI step "${stepName}" output was cut off (token limit reached). ` +
+      `This is a prompt configuration issue — retrying will not help. ` +
+      `Please report this to the site administrator.`
+    );
+    this.name = 'GroqTruncationError';
+  }
+}
+
+async function callGroqWithUsage(
+  prompt: string,
+  stepName: string
+): Promise<GroqResult> {
   const Groq = (await import('groq-sdk')).default;
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+  const timeoutMs = TIMEOUT_MS[stepName] ?? TIMEOUT_MS.default;
+  const maxTokens = MAX_TOKENS[stepName] ?? MAX_TOKENS.default;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   const start = Date.now();
+  try {
+    const completion = await client.chat.completions.create(
+      {
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: maxTokens,
+      },
+      { signal: controller.signal }
+    );
 
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Groq request timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS)
-  );
+    clearTimeout(timer);
+    const latencyMs = Date.now() - start;
+    const promptTokens = completion.usage?.prompt_tokens ?? 0;
+    const completionTokens = completion.usage?.completion_tokens ?? 0;
+    const finishReason = completion.choices[0]?.finish_reason ?? null;
 
-  const completion = await Promise.race([
-    client.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 4096,
-    }),
-    timeoutPromise,
-  ]);
-
-  const latencyMs = Date.now() - start;
-  const promptTokens = completion.usage?.prompt_tokens ?? 0;
-  const completionTokens = completion.usage?.completion_tokens ?? 0;
-
-  return {
-    content: completion.choices[0]?.message?.content ?? '',
-    usage: {
-      model: MODEL,
-      promptTokens,
-      completionTokens,
-      totalTokens: promptTokens + completionTokens,
-      latencyMs,
-      estimatedCostUsd: estimateCost(MODEL, promptTokens, completionTokens),
-    },
-  };
+    return {
+      content: completion.choices[0]?.message?.content ?? '',
+      finishReason,
+      usage: {
+        model: MODEL,
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        latencyMs,
+        estimatedCostUsd: estimateCost(MODEL, promptTokens, completionTokens),
+      },
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    if (
+      err instanceof Error &&
+      (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('abort'))
+    ) {
+      throw new GroqTimeoutError(stepName, timeoutMs);
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +171,9 @@ function extractJson(raw: string): string {
 
 // ---------------------------------------------------------------------------
 // Validated call with retry
-// Retries up to MAX_RETRIES times on parse or validation failure.
-// Returns parsed data + aggregated usage across all attempts.
+// Retries up to MAX_RETRIES times on parse / validation failure only.
+// Timeout and token-limit truncation are non-retriable: they will recur
+// on the same prompt and waste quota budget.
 // ---------------------------------------------------------------------------
 async function callAndValidate<T>(
   prompt: string,
@@ -123,8 +184,15 @@ async function callAndValidate<T>(
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-    const { content, usage } = await callGroqWithUsage(prompt);
+    const { content, usage, finishReason } = await callGroqWithUsage(prompt, stepName);
     usages.push(usage);
+
+    // If the model hit the token limit the JSON is truncated — retrying with
+    // the same prompt won't help; throw immediately so quota isn't burned on
+    // doomed retries.
+    if (finishReason === 'length') {
+      throw new GroqTruncationError(stepName);
+    }
 
     const jsonStr = extractJson(content);
     let parsed: unknown;
