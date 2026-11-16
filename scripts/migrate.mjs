@@ -78,7 +78,9 @@ async function main() {
     const stmts = extractStatements(ddl);
     console.log(`  apply ${hash} (${stmts.length} statements)`);
     for (const stmt of stmts) {
-      await sql([stmt]);
+      // sql([stmt]) was removed in @neondatabase/serverless v1.2.1 —
+      // sql.query(stmt) is the correct raw-string execution API.
+      await sql.query(stmt);
     }
     await sql`INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (${hash}, ${Date.now()})`;
     console.log(`  done  ${hash}`);
