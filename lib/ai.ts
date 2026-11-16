@@ -33,11 +33,14 @@ const TIMEOUT_MS: Record<string, number> = {
   default:              30_000,
 };
 
-// Per-step max_tokens.  Each 4-phase batch uses ~1,800–2,200 tokens; 4 096
-// gives 2× headroom without risking the per-request truncation that plagued
-// the original single 8-phase call.
+// Per-step max_tokens.
+// Roadmap batches: after prompt tightening (exactly 3 topics + 1 resource per
+// phase) the expected output is ~1,000–1,500 tokens per batch. 4,096 gives 3×
+// headroom. Previously this limit was being hit for skill-heavy roles (e.g.
+// Frontend Developer) because the prompt allowed 5+ topics and 2 resources.
 const MAX_TOKENS: Record<string, number> = {
-  extractSkills:       1_024,
+  // 1536 — ml-engineer resume hits 1024 exactly (truncated); bumped 50% for headroom
+  extractSkills:       1_536,
   getRoleRequirements: 2_048,
   analyzeGap:          1_024,
   roadmapBatch1:       4_096,
@@ -139,6 +142,10 @@ async function callGroqWithUsage(
     const completionTokens = completion.usage?.completion_tokens ?? 0;
     const finishReason = completion.choices[0]?.finish_reason ?? null;
 
+    console.info(
+      `[groq:${stepName}] finish_reason=${finishReason} prompt=${promptTokens} completion=${completionTokens} max=${maxTokens} latency=${latencyMs}ms`
+    );
+
     return {
       content: completion.choices[0]?.message?.content ?? '',
       finishReason,
@@ -194,6 +201,11 @@ async function callAndValidate<T>(
     // the same prompt won't help; throw immediately so quota isn't burned on
     // doomed retries.
     if (finishReason === 'length') {
+      console.error(
+        `[groq:${stepName}] TRUNCATED on attempt ${attempt}: ` +
+        `completion=${usage.completionTokens} hit max_tokens limit. ` +
+        `prompt=${usage.promptTokens} total=${usage.promptTokens + usage.completionTokens}`
+      );
       throw new GroqTruncationError(stepName);
     }
 
@@ -202,6 +214,7 @@ async function callAndValidate<T>(
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e) {
+      console.warn(`[groq:${stepName}] JSON parse failed on attempt ${attempt}: ${e}`);
       lastError = new Error(`${stepName}: JSON parse failed on attempt ${attempt}: ${e}`);
       continue;
     }
@@ -211,8 +224,10 @@ async function callAndValidate<T>(
       return { data: result.data, usages };
     }
 
+    const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    console.warn(`[groq:${stepName}] schema validation failed on attempt ${attempt}: ${issues}`);
     lastError = new Error(
-      `${stepName}: schema validation failed on attempt ${attempt}: ${result.error.issues.map((i) => i.message).join('; ')}`
+      `${stepName}: schema validation failed on attempt ${attempt}: ${issues}`
     );
   }
 
@@ -312,7 +327,7 @@ const BATCH_WEEK_PAIRS: [number, number][] = [
   [9, 10], [11, 12], [13, 14], [15, 16], // batch 2
 ];
 
-function roadmapBatchPrompt(
+export function roadmapBatchPrompt(
   gapAnalysis: GapAnalysis,
   targetRole: string,
   batchIndex: 0 | 1   // 0 = phases 1-4, 1 = phases 5-8
@@ -324,8 +339,11 @@ function roadmapBatchPrompt(
     ? 'Focus on foundational skills first.'
     : 'Build on the foundational phases; cover advanced and integration skills.';
 
-  // Keep descriptions compact: ≤12 words each, 1 resource per phase.
-  // Explicitly name the ONLY valid type values to avoid schema failures.
+  // Token budget constraints (keep phases compact so 4-phase batches fit
+  // well within max_tokens=4096 even for skill-heavy roles like Frontend Dev):
+  // - Exactly 3 topics per phase (prevents models from listing 5-7 topics)
+  // - Exactly 1 resource per phase (prevents 2-resource inflation)
+  // - Short focus_area, description, tech, milestone (word limits below)
   return `Create phases ${phaseNums[0]}-${phaseNums[3]} of an 8-phase learning roadmap for ${targetRole}.
 Skills to cover across the full roadmap: ${JSON.stringify(gapAnalysis.missing_critical)}
 ${context}
@@ -336,22 +354,26 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
     {
       "week_start": ${pairs[0][0]},
       "week_end": ${pairs[0][1]},
-      "focus_area": "...",
+      "focus_area": "short phrase",
       "topics": ["topic1", "topic2", "topic3"],
       "resources": [
-        {"title": "...", "url": "https://...", "type": "Docs"}
+        {"title": "Resource name", "url": "https://...", "type": "Docs"}
       ],
-      "project": {"title": "...", "description": "...", "tech": ["..."], "hours": 8},
-      "milestone": "..."
+      "project": {"title": "Project name", "description": "12 words max", "tech": ["tech1", "tech2"], "hours": 8},
+      "milestone": "15 words max"
     }
   ]
 }
 
-Rules:
+Rules — follow exactly, no exceptions:
 - Return exactly 4 phases with these week_start/week_end pairs: ${weekList}
+- Return exactly 3 topics per phase (not 2, not 4, not 5)
+- Return exactly 1 resource per phase
 - resource.type MUST be exactly one of: Video, Docs, Course, Article, Book
-- Use 1-2 resources per phase with real URLs (docs.*, youtube.com, coursera.org, github.com)
+- resource.url must be a real URL (docs.*, youtube.com, coursera.org, github.com)
+- Keep focus_area under 6 words
 - Keep project.description under 12 words
+- Keep project.tech to at most 2 items
 - Keep milestone under 15 words`;
 }
 

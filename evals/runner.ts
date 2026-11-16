@@ -240,6 +240,94 @@ async function evalLiveSkillExtraction(): Promise<EvalResult[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Live roadmap generation eval
+// Specifically targets the Frontend Developer truncation regression:
+// previously the gap analysis produced a large missing_critical list that
+// caused roadmapBatch1/2 to exceed max_tokens=4096.
+// ---------------------------------------------------------------------------
+async function evalLiveRoadmapGeneration(): Promise<EvalResult[]> {
+  const results: EvalResult[] = [];
+  const { runAnalysis } = await import('../lib/ai');
+
+  // Use the junior-swe fixture (closest to a typical FE candidate) with
+  // the frontend-developer JD — the most skill-gap-heavy combination.
+  const resume = RESUME_FIXTURES[0]; // junior-swe
+  const jd = JOB_FIXTURES.find((j) => j.id === 'frontend-developer')!;
+
+  const start = Date.now();
+  try {
+    const result = await runAnalysis(
+      `eval-roadmap-${jd.id}`,
+      resume.text,
+      jd.targetRole,
+      jd.description,
+    );
+    const latencyMs = Date.now() - start;
+
+    // Must have exactly 8 phases
+    results.push({
+      name: `live_roadmap_8_phases:${jd.id}`,
+      passed: result.roadmap.length === 8,
+      details: `${result.roadmap.length} phases generated in ${latencyMs}ms`,
+      metric: result.roadmap.length,
+    });
+
+    // Week continuity: each phase must start immediately after previous ends
+    let continuous = true;
+    for (let i = 1; i < result.roadmap.length; i++) {
+      if (result.roadmap[i].week_start !== result.roadmap[i - 1].week_end + 1) {
+        continuous = false;
+        break;
+      }
+    }
+    results.push({
+      name: `live_roadmap_week_continuity:${jd.id}`,
+      passed: continuous,
+      details: continuous
+        ? `weeks 1-16 continuous across all 8 phases`
+        : `week gap detected in roadmap phases`,
+    });
+
+    // Every phase must have exactly 3 topics (prompt now enforces this)
+    const phasesWith3Topics = result.roadmap.filter((w) => w.topics.length === 3).length;
+    results.push({
+      name: `live_roadmap_3_topics_per_phase:${jd.id}`,
+      passed: phasesWith3Topics === 8,
+      details: `${phasesWith3Topics}/8 phases have exactly 3 topics`,
+      metric: phasesWith3Topics,
+    });
+
+    // Every phase must have exactly 1 resource
+    const phasesWith1Resource = result.roadmap.filter((w) => w.resources.length === 1).length;
+    results.push({
+      name: `live_roadmap_1_resource_per_phase:${jd.id}`,
+      passed: phasesWith1Resource === 8,
+      details: `${phasesWith1Resource}/8 phases have exactly 1 resource`,
+      metric: phasesWith1Resource,
+    });
+
+    // Pipeline usage must be reported
+    if (result.pipelineUsage) {
+      results.push({
+        name: `live_roadmap_usage_reported:${jd.id}`,
+        passed: true,
+        details: `tokens=${result.pipelineUsage.totals.totalTokens} latency=${latencyMs}ms cost=$${result.pipelineUsage.totals.estimatedCostUsd.toFixed(6)}`,
+        metric: result.pipelineUsage.totals.totalTokens,
+      });
+    }
+  } catch (err) {
+    const latencyMs = Date.now() - start;
+    results.push({
+      name: `live_roadmap_generation:${jd.id}`,
+      passed: false,
+      details: `FAILED after ${latencyMs}ms: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
@@ -263,6 +351,10 @@ async function run(): Promise<void> {
     console.log('Running live evaluations against Groq API...\n');
     const liveResults = await evalLiveSkillExtraction();
     allResults.push(...liveResults);
+
+    console.log('Running live roadmap generation eval (Frontend Developer regression)...\n');
+    const roadmapResults = await evalLiveRoadmapGeneration();
+    allResults.push(...roadmapResults);
   }
 
   const passed = allResults.filter((r) => r.passed).length;

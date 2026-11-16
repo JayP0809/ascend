@@ -6,7 +6,10 @@ import { RESOURCE_TYPES, type ResourceType } from './types';
 // Bump PROMPT_VERSION when any prompt text changes so eval results stay
 // traceable to the exact prompt that generated them.
 // ---------------------------------------------------------------------------
-export const PROMPT_VERSION = '1.1.0';
+// 1.2.0 — roadmap prompt tightened: exactly 3 topics + 1 resource per phase,
+//          focus_area ≤6 words, tech ≤2 items; prevents truncation on
+//          skill-heavy roles (e.g. Frontend Developer).
+export const PROMPT_VERSION = '1.2.0';
 
 // ---------------------------------------------------------------------------
 // Zod schemas for every structured AI response

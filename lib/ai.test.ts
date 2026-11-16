@@ -28,6 +28,7 @@ import {
   GroqTimeoutError,
   GroqTruncationError,
   RoadmapAssemblyError,
+  roadmapBatchPrompt,
 } from './ai';
 
 // ---------------------------------------------------------------------------
@@ -387,6 +388,80 @@ describe('RoadmapBatchSchema — exact phase count', () => {
 
   it.each([0, 1, 2, 3, 5, 8])('rejects %i phases', (count) => {
     expect(RoadmapBatchSchema.safeParse(makeRaw(count)).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: Frontend Developer truncation (phase-1a bug)
+//
+// Root cause: roadmap prompt previously allowed unlimited topics-per-phase
+// and "1-2" resources, causing the model to exceed max_tokens=4096 for
+// skill-heavy roles. Fix: exactly 3 topics + 1 resource per phase, with
+// explicit word-count limits for focus_area, description, tech, milestone.
+// ---------------------------------------------------------------------------
+describe('roadmap prompt — token budget constraints', () => {
+  // A large missing_critical list similar to what Frontend Developer produces.
+  const frontendGap = {
+    missing_critical: [
+      'React', 'TypeScript', 'CSS Grid', 'Flexbox', 'Webpack', 'Vite',
+      'Next.js', 'Jest', 'React Testing Library', 'Cypress', 'Redux',
+      'GraphQL', 'Accessibility', 'Web Performance', 'CSS Modules',
+    ],
+    missing_nice: ['Storybook', 'Tailwind CSS'],
+    transferable: ['JavaScript', 'HTML', 'Git'],
+    readiness_score: 45,
+    strengths_summary: 'Strong JavaScript fundamentals',
+    biggest_gap: 'React ecosystem and TypeScript',
+  };
+
+  it('batch 1 prompt includes "exactly 3 topics per phase" rule', () => {
+    const prompt = roadmapBatchPrompt(frontendGap, 'Frontend Developer', 0);
+    expect(prompt).toMatch(/exactly 3 topics per phase/);
+  });
+
+  it('batch 1 prompt includes "exactly 1 resource per phase" rule', () => {
+    const prompt = roadmapBatchPrompt(frontendGap, 'Frontend Developer', 0);
+    expect(prompt).toMatch(/exactly 1 resource per phase/);
+  });
+
+  it('batch 2 prompt includes the same constraints', () => {
+    const prompt = roadmapBatchPrompt(frontendGap, 'Frontend Developer', 1);
+    expect(prompt).toMatch(/exactly 3 topics per phase/);
+    expect(prompt).toMatch(/exactly 1 resource per phase/);
+  });
+
+  it('batch prompt includes project.tech word limit', () => {
+    const prompt = roadmapBatchPrompt(frontendGap, 'Frontend Developer', 0);
+    expect(prompt).toMatch(/project\.tech to at most 2 items/);
+  });
+
+  it('full pipeline succeeds with large missing_critical list (mocked)', async () => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+
+    const largeMissingCriticalGap = JSON.stringify({
+      missing_critical: frontendGap.missing_critical,
+      missing_nice: frontendGap.missing_nice,
+      transferable: frontendGap.transferable,
+      readiness_score: 45,
+      strengths_summary: 'Strong JavaScript fundamentals',
+      biggest_gap: 'React ecosystem and TypeScript',
+    });
+
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(largeMissingCriticalGap))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    const result = await runAnalysis('fe-test-id', 'resume text', 'Frontend Developer');
+    expect(result.isDemoMode).toBe(false);
+    expect(result.roadmap).toHaveLength(8);
+    // Verify no phases were lost or duplicated
+    expect(result.roadmap[0].week_start).toBe(1);
+    expect(result.roadmap[7].week_end).toBe(16);
+    expect(mockCreate).toHaveBeenCalledTimes(5);
   });
 });
 

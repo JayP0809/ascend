@@ -135,4 +135,14 @@ export const JOB_FIXTURES: JobDescriptionFixture[] = [
     description: 'Frontend Engineer with React, TypeScript, and CSS expertise. Experience with testing frameworks and CI/CD pipelines preferred.',
     mustHaveSkills: ['React', 'TypeScript'],
   },
+  // This fixture specifically exercises the truncation regression (phase-1a):
+  // Frontend Developer has many required skills, producing a large
+  // missing_critical list in gap analysis that previously caused roadmap
+  // batch responses to exceed max_tokens=4096.
+  {
+    id: 'frontend-developer',
+    targetRole: 'Frontend Developer',
+    description: 'Frontend Developer with deep React, TypeScript, Next.js, and testing expertise. Must know CSS Grid, Flexbox, Webpack/Vite, and have CI/CD experience.',
+    mustHaveSkills: ['React', 'TypeScript', 'Next.js', 'CSS'],
+  },
 ];
