@@ -44,7 +44,9 @@ const MAX_TOKENS: Record<string, number> = {
   // 1536 — ml-engineer resume hits 1024 exactly (truncated); bumped 50% for headroom
   extractSkills:       1_536,
   getRoleRequirements: 2_048,
-  analyzeGap:          1_024,
+  // 1536 — internship/co-op roles can produce many gap items + verbose summary;
+  // 1024 was tight for student roles with 20+ foundational skill gaps.
+  analyzeGap:          1_536,
   roadmapBatch1:       4_096,
   roadmapBatch2:       4_096,
   default:             4_096,
@@ -110,6 +112,17 @@ export class GroqTruncationError extends Error {
       `Please report this to the site administrator.`
     );
     this.name = 'GroqTruncationError';
+  }
+}
+
+export class GroqValidationError extends Error {
+  constructor(stepName: string) {
+    super(
+      `The AI returned an unexpected response for "${stepName}". ` +
+      `Please try again. If this keeps happening, try rephrasing the target role ` +
+      `(e.g., "Software Engineer" instead of a very specific or unusual title).`
+    );
+    this.name = 'GroqValidationError';
   }
 }
 
@@ -228,9 +241,8 @@ async function callAndValidate<T>(
 
     const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     console.warn(`[groq:${stepName}] schema validation failed on attempt ${attempt}: ${issues}`);
-    lastError = new Error(
-      `${stepName}: schema validation failed on attempt ${attempt}: ${issues}`
-    );
+    // Store the debug message for internal logging but don't surface it to users.
+    lastError = new GroqValidationError(stepName);
   }
 
   throw lastError;
@@ -274,7 +286,7 @@ function employmentInstruction(ctx: EmploymentContext | undefined): string {
   if (!ctx) return '';
   switch (ctx.level) {
     case 'internship':
-      return '\nIMPORTANT: This is an INTERNSHIP role. Calibrate for a student applicant: focus on foundational skills, coursework, and 1-2 portfolio projects. Omit multi-year experience requirements.';
+      return '\nIMPORTANT: This is an INTERNSHIP role. Calibrate for a student applicant: use beginner-friendly resources and achievable projects. Omit multi-year experience requirements.';
     case 'coop':
       return '\nIMPORTANT: This is a CO-OP role (4-8 months). Calibrate for a student: foundational to intermediate skills, relevant coursework, prior co-ops/internships a plus. Omit multi-year professional experience.';
     case 'entry-level':
@@ -318,8 +330,7 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
     "certifications": ["AWS Certified"]
   },
   "typical_timeline_months": 6,
-  "avg_salary": "$120,000",
-  "demand_level": "High"
+  "avg_salary": "$120,000"
 }`;
 }
 
@@ -363,13 +374,18 @@ export function roadmapBatchPrompt(
 
   const employmentNote = employmentInstruction(employmentCtx);
 
+  // Cap the skills list passed to the model: beyond 12, 8 phases can't cover
+  // them meaningfully anyway, and a long list inflates both prompt and output.
+  // Internship/entry-level roles can produce 20+ foundational gaps.
+  const skillsToCover = gapAnalysis.missing_critical.slice(0, 12);
+
   // Token budget constraints (keep phases compact so 4-phase batches fit
   // well within max_tokens=4096 even for skill-heavy roles like Frontend Dev):
   // - Exactly 3 topics per phase (prevents models from listing 5-7 topics)
   // - Exactly 1 resource per phase (prevents 2-resource inflation)
   // - Short focus_area, description, tech, milestone (word limits below)
   return `Create phases ${phaseNums[0]}-${phaseNums[3]} of an 8-phase learning roadmap for ${targetRole}.
-Skills to cover across the full roadmap: ${JSON.stringify(gapAnalysis.missing_critical)}
+Skills to cover across the full roadmap: ${JSON.stringify(skillsToCover)}
 ${context}${employmentNote}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
@@ -604,7 +620,6 @@ export function getDemoData(analysisId: string = DEMO_ANALYSIS_ID, targetRole = 
       },
       typical_timeline_months: 6,
       avg_salary: '$135,000',
-      demand_level: 'High',
     },
     gapAnalysis: {
       missing_critical: [

@@ -5,7 +5,7 @@
  * Live integration tests (gated by GROQ_API_KEY) verify the actual model responds.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ResourceSchema, RoadmapBatchSchema } from './ai-schemas';
+import { ResourceSchema, RoadmapBatchSchema, RoleRequirementsSchema } from './ai-schemas';
 
 // ---- mock groq-sdk --------------------------------------------------------
 // vi.mock is hoisted to the top of the file so the factory must reference a
@@ -27,6 +27,7 @@ import {
   isLiveMode,
   GroqTimeoutError,
   GroqTruncationError,
+  GroqValidationError,
   RoadmapAssemblyError,
   roadmapBatchPrompt,
 } from './ai';
@@ -55,7 +56,7 @@ const VALID_ROLE_JSON = JSON.stringify({
   categories: { technical: ['Docker'], soft: ['Communication'], tools: ['Git'], certifications: [] },
   typical_timeline_months: 6,
   avg_salary: '$120,000',
-  demand_level: 'High',
+  // demand_level removed in v1.4.0 — no longer in schema or prompt
 });
 
 const VALID_GAP_JSON = JSON.stringify({
@@ -201,14 +202,22 @@ describe('successful pipeline', () => {
     expect(mockCreate).toHaveBeenCalledTimes(5);
   });
 
-  it('exhausts retries and throws on persistent schema validation failure', async () => {
+  it('exhausts retries and throws GroqValidationError on persistent schema validation failure', async () => {
     // Every call returns malformed JSON → schema validation fails on every attempt.
     // MAX_RETRIES = 1 means 2 attempts total per step before throwing.
     mockCreate.mockResolvedValue(makeCompletion('{"bad": "shape"}'));
 
     await expect(
       runAnalysis('live-id', 'resume text', 'Software Engineer')
-    ).rejects.toThrow(/schema validation failed/);
+    ).rejects.toBeInstanceOf(GroqValidationError);
+  });
+
+  it('GroqValidationError message is user-friendly and does not expose schema internals', () => {
+    const err = new GroqValidationError('getRoleRequirements');
+    expect(err.message).not.toMatch(/schema validation/);
+    expect(err.message).not.toMatch(/demand_level/);
+    expect(err.message).toContain('unexpected response');
+    expect(err.name).toBe('GroqValidationError');
   });
 });
 
@@ -267,7 +276,7 @@ describe('batched roadmap generation', () => {
 
     await expect(
       runAnalysis('live-id', 'resume text', 'Software Engineer')
-    ).rejects.toThrow(/schema validation failed/);
+    ).rejects.toBeInstanceOf(GroqValidationError);
 
     // 3 pipeline steps + 2 attempts at the failing batch = 5 total.
     // Batch 2 is never called.
@@ -287,7 +296,7 @@ describe('batched roadmap generation', () => {
 
     await expect(
       runAnalysis('live-id', 'resume text', 'Software Engineer')
-    ).rejects.toThrow(/schema validation failed/);
+    ).rejects.toBeInstanceOf(GroqValidationError);
 
     expect(mockCreate).toHaveBeenCalledTimes(5);
   });
@@ -521,6 +530,122 @@ describe('roadmap prompt — employment level context', () => {
     const withCtx = roadmapBatchPrompt(baseGap, 'Software Engineer', 0, expCtx);
     const withoutCtx = roadmapBatchPrompt(baseGap, 'Software Engineer', 0);
     expect(withCtx).toBe(withoutCtx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: missing_critical cap in roadmap prompt (v1.4.0)
+//
+// Internship / entry-level roles can produce 20+ foundational skill gaps.
+// The roadmap prompt must cap missing_critical at 12 to prevent inflated
+// output that could exceed token budgets or produce unfocused roadmaps.
+// ---------------------------------------------------------------------------
+describe('roadmap prompt — missing_critical cap', () => {
+  const internshipGap = {
+    missing_critical: [
+      'OOP', 'Data Structures', 'Algorithms', 'Version Control', 'SQL',
+      'REST APIs', 'Testing', 'Debugging', 'Java', 'Linux', 'Networking',
+      'Databases', 'Web Development', 'JavaScript', 'React', 'Node.js',
+      'Git', 'AWS', 'Docker', 'CI/CD', // 20 items — exceeds the cap
+    ],
+    missing_nice: ['Kubernetes', 'TypeScript'],
+    transferable: ['Python'],
+    readiness_score: 25,
+    strengths_summary: 'Strong academic background',
+    biggest_gap: 'Professional engineering experience',
+  };
+
+  it('caps missing_critical to 12 items in the roadmap prompt', () => {
+    const prompt = roadmapBatchPrompt(internshipGap, 'Software Engineering Intern', 0);
+    // The prompt must NOT contain item 13+ from the list (AWS, Docker, CI/CD)
+    expect(prompt).not.toMatch(/"AWS"/);
+    expect(prompt).not.toMatch(/"Docker"/);
+    expect(prompt).not.toMatch(/"CI\/CD"/);
+    // But the first 12 items should be present
+    expect(prompt).toMatch(/"OOP"/);
+    expect(prompt).toMatch(/"Data Structures"/);
+  });
+
+  it('internship prompt does not contain "1-2 portfolio projects" phrase', () => {
+    const internCtx = {
+      level: 'internship' as const,
+      confidence: 'high' as const,
+      inferredFrom: 'role_title' as const,
+      signals: ['internship keyword in role title'],
+    };
+    const prompt = roadmapBatchPrompt(internshipGap, 'Software Engineering Intern', 0, internCtx);
+    // This phrase previously confused the model about output constraints
+    expect(prompt).not.toMatch(/1-2 portfolio projects/);
+    // The internship marker must still appear
+    expect(prompt).toMatch(/INTERNSHIP/i);
+  });
+
+  it('full pipeline with 20-item internship gap passes through (mocked)', async () => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+
+    const internshipGapJson = JSON.stringify(internshipGap);
+
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(internshipGapJson))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    const result = await runAnalysis('intern-test-id', 'resume text', 'Software Engineering Intern');
+    expect(result.isDemoMode).toBe(false);
+    expect(result.roadmap).toHaveLength(8);
+    expect(mockCreate).toHaveBeenCalledTimes(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: role-specific schema validation — no demand_level (v1.4.0)
+//
+// RoleRequirementsSchema must succeed without demand_level and must NOT
+// validate it even when the model returns it (the extra field is ignored
+// by Zod's default strip behavior).
+// ---------------------------------------------------------------------------
+describe('RoleRequirementsSchema — demand_level removed', () => {
+  it('passes without demand_level', () => {
+    const result = RoleRequirementsSchema.safeParse({
+      required_skills: ['Python', 'React'],
+      nice_to_have: ['Docker'],
+      categories: { technical: ['Python'], soft: [], tools: [], certifications: [] },
+      typical_timeline_months: 6,
+      avg_salary: '$120,000',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('still passes when model returns demand_level (extra field is stripped)', () => {
+    const result = RoleRequirementsSchema.safeParse({
+      required_skills: ['Python'],
+      nice_to_have: [],
+      categories: { technical: [], soft: [], tools: [], certifications: [] },
+      typical_timeline_months: 6,
+      avg_salary: '$100,000',
+      demand_level: 'High', // model might still return this — must not break validation
+    });
+    expect(result.success).toBe(true);
+    // The extra field is stripped by Zod's default behavior
+    if (result.success) {
+      expect((result.data as Record<string, unknown>).demand_level).toBeUndefined();
+    }
+  });
+
+  it('passes when model returns non-canonical demand_level (not in old enum)', () => {
+    // "Very High" previously caused validation failure — now it's just stripped
+    const result = RoleRequirementsSchema.safeParse({
+      required_skills: ['Python'],
+      nice_to_have: [],
+      categories: { technical: [], soft: [], tools: [], certifications: [] },
+      typical_timeline_months: 6,
+      avg_salary: '$100,000',
+      demand_level: 'Very High', // the value that was causing failures
+    });
+    expect(result.success).toBe(true);
   });
 });
 

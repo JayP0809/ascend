@@ -74,6 +74,37 @@ Other: A/B testing, Excel, Git
     expectedExperienceRange: [3, 6],
   },
   {
+    id: 'cs-student-intern',
+    description: 'CS student (junior year), 1 internship, Python and Java focus',
+    text: `
+Taylor Kim
+Computer Science Student | taylor.kim@example.edu
+
+EDUCATION
+B.S. Computer Science — State University (Expected 2026, GPA 3.7)
+Relevant coursework: Data Structures, Algorithms, Operating Systems, Databases, Web Development
+
+EXPERIENCE
+Software Engineering Intern — SmallStartup (Summer 2024)
+- Built a REST API endpoint using Python and Flask
+- Fixed 5 bugs in the existing Java codebase
+- Wrote unit tests with pytest
+
+PROJECTS
+To-Do App (Personal Project, 2024)
+- Full-stack web app: Python/Flask backend, HTML/CSS/JavaScript frontend
+- Deployed on Heroku using basic Docker container
+
+SKILLS
+Languages: Python, Java, JavaScript, SQL (basic)
+Tools: Git, GitHub, VS Code
+Soft: Problem Solving, Quick Learner, Teamwork
+    `.trim(),
+    expectedSkills: ['Python', 'Java', 'JavaScript', 'SQL', 'Git', 'Flask', 'Docker'],
+    unexpectedSkills: ['Kubernetes', 'React', 'TensorFlow', 'AWS', 'TypeScript'],
+    expectedExperienceRange: [0, 2],
+  },
+  {
     id: 'ml-engineer',
     description: 'ML engineer with 5 years, PyTorch and Python, some cloud',
     text: `
@@ -144,5 +175,35 @@ export const JOB_FIXTURES: JobDescriptionFixture[] = [
     targetRole: 'Frontend Developer',
     description: 'Frontend Developer with deep React, TypeScript, Next.js, and testing expertise. Must know CSS Grid, Flexbox, Webpack/Vite, and have CI/CD experience.',
     mustHaveSkills: ['React', 'TypeScript', 'Next.js', 'CSS'],
+  },
+  // Regression fixture for failure 1: Software Engineer returning non-canonical
+  // demand_level values ("Very High", "High Demand") that broke schema validation.
+  {
+    id: 'software-engineer',
+    targetRole: 'Software Engineer',
+    description: 'Software Engineer with experience in Python, Java, or Go. Must have strong CS fundamentals, REST API design, and experience with cloud platforms.',
+    mustHaveSkills: ['Python', 'REST APIs'],
+  },
+  // Regression fixture for failure 2: Software Engineering Intern triggering
+  // truncation due to long missing_critical list and verbose internship output.
+  // The employment-level classifier must detect this as internship.
+  {
+    id: 'software-engineering-intern',
+    targetRole: 'Software Engineering Intern',
+    description: 'Looking for a motivated Software Engineering Intern to join our team for a 12-week summer program. Seeking students currently enrolled in a Computer Science or related degree. No prior professional experience required.',
+    mustHaveSkills: ['Python', 'Git'],
+  },
+  // Non-technology roles: verify the pipeline works for roles outside SWE.
+  {
+    id: 'product-manager',
+    targetRole: 'Product Manager',
+    description: 'Product Manager to own product roadmap, write PRDs, collaborate with engineering, and drive data-informed decisions. Experience with Agile, SQL, and stakeholder communication required.',
+    mustHaveSkills: ['Agile', 'SQL'],
+  },
+  {
+    id: 'marketing-analyst',
+    targetRole: 'Marketing Analyst',
+    description: 'Marketing Analyst to analyze campaign performance, build dashboards, and provide actionable insights. Proficiency in SQL, Excel, and Google Analytics required.',
+    mustHaveSkills: ['SQL', 'Excel'],
   },
 ];

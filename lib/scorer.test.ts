@@ -189,7 +189,6 @@ const makeAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =
     categories: { technical: [], soft: [], tools: [], certifications: [] },
     typical_timeline_months: 6,
     avg_salary: '$130,000',
-    demand_level: 'High',
   },
   gapAnalysis: {
     missing_critical: ['Docker', 'Kubernetes'],
@@ -244,7 +243,6 @@ describe('buildMarketDemandData', () => {
         categories: { technical: [], soft: [], tools: [], certifications: [] },
         typical_timeline_months: 6,
         avg_salary: '$100,000',
-        demand_level: 'High',
       },
     });
     const result = buildMarketDemandData(longSkillAnalysis);
@@ -259,7 +257,6 @@ describe('buildMarketDemandData', () => {
         categories: { technical: [], soft: [], tools: [], certifications: [] },
         typical_timeline_months: 6,
         avg_salary: '$100,000',
-        demand_level: 'Low',
       },
     });
     expect(() => buildMarketDemandData(emptyAnalysis)).not.toThrow();

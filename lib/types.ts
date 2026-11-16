@@ -76,7 +76,9 @@ export interface RoleRequirements {
   };
   typical_timeline_months: number;
   avg_salary: string;
-  demand_level: 'High' | 'Medium' | 'Low';
+  // Optional: retained for backward compatibility with stored result_json records.
+  // No longer requested from the AI or rendered in the UI.
+  demand_level?: 'High' | 'Medium' | 'Low';
 }
 
 export interface GapAnalysis {

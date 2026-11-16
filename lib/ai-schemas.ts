@@ -9,7 +9,11 @@ import { RESOURCE_TYPES, type ResourceType } from './types';
 // 1.3.0 — employment level context added to role-requirements, gap-analysis,
 //          and roadmap prompts; calibrates AI output for internship/co-op/entry-level
 //          targets vs. full-time experienced roles.
-export const PROMPT_VERSION = '1.3.0';
+// 1.4.0 — removed demand_level from role-requirements prompt and schema (field
+//          was unused in UI; model returned non-canonical values causing failures);
+//          increased analyzeGap budget; capped missing_critical at 12 in roadmap
+//          prompt; tightened internship instruction to prevent output verbosity.
+export const PROMPT_VERSION = '1.4.0';
 
 // ---------------------------------------------------------------------------
 // Zod schemas for every structured AI response
@@ -34,7 +38,8 @@ export const RoleRequirementsSchema = z.object({
   }),
   typical_timeline_months: z.number().int().min(1).max(60),
   avg_salary: z.string(),
-  demand_level: z.enum(['High', 'Medium', 'Low']),
+  // demand_level removed in v1.4.0 — not used in UI, caused validation failures
+  // when model returned non-canonical values ("Very High", "HIGH Demand", etc.)
 });
 
 export const GapAnalysisSchema = z.object({
@@ -72,9 +77,8 @@ function normalizeResourceType(raw: string): ResourceType {
 }
 
 // resource.type is accepted as any non-empty string from the model and
-// normalized to the canonical set via the transform above.  The UI's
-// RESOURCE_COLORS lookup uses these exact keys, so normalization ensures
-// every resource renders with the correct color without a fallback branch.
+// normalized to the canonical set via the transform above, so every resource
+// renders correctly regardless of model output variation.
 export const ResourceSchema = z.object({
   title: z.string().min(1),
   url: z.string().url(),

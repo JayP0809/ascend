@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
-import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, RoadmapAssemblyError } from '@/lib/ai';
+import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
 import { reserveQuotaSlot, refundQuotaSlot } from '@/lib/quota';
@@ -166,6 +166,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           error: 'Roadmap generation produced an inconsistent result. Please try again.',
           retryable: true,
+        },
+        { status: 500 }
+      );
+    }
+    if (error instanceof GroqValidationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          retryable: true,
+          hint: 'Your quota slot was refunded — you can try again.',
         },
         { status: 500 }
       );

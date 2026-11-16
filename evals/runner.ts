@@ -25,6 +25,7 @@ import {
 } from '../lib/ai-schemas';
 import { getDemoData } from '../lib/ai';
 import { buildDashboardData } from '../lib/scorer';
+import { classifyEmploymentLevel } from '../lib/employment-level';
 
 const RUN_LIVE = process.env.RUN_EVALS === 'true';
 
@@ -124,17 +125,53 @@ function evalSchemaValidation(): EvalResult[] {
   const r3 = GapAnalysisSchema.safeParse(badGap);
   results.push({ name: 'schema_gap_score_out_of_range', passed: !r3.success, details: !r3.success ? 'correctly rejected score=150' : 'SHOULD HAVE FAILED' });
 
-  // demand_level must be enum
-  const badRole = {
+  // demand_level removed from schema (v1.4.0) — model returning non-canonical
+  // values like "Very High" should no longer cause failures.
+  const roleWithExtraDemandLevel = {
     required_skills: ['Python'],
     nice_to_have: [],
     categories: { technical: [], soft: [], tools: [], certifications: [] },
     typical_timeline_months: 6,
     avg_salary: '$100k',
-    demand_level: 'Very High',
+    demand_level: 'Very High', // extra field: should be stripped, not fail
   };
-  const r4 = RoleRequirementsSchema.safeParse(badRole);
-  results.push({ name: 'schema_role_demand_level_invalid_enum', passed: !r4.success, details: !r4.success ? 'correctly rejected "Very High"' : 'SHOULD HAVE FAILED' });
+  const r4 = RoleRequirementsSchema.safeParse(roleWithExtraDemandLevel);
+  results.push({
+    name: 'schema_role_demand_level_stripped_not_rejected',
+    passed: r4.success,
+    details: r4.success
+      ? 'demand_level="Very High" correctly stripped (was previously causing validation failures)'
+      : `REGRESSION: validation unexpectedly failed — ${r4.error?.message}`,
+  });
+
+  return results;
+}
+
+function evalEmploymentLevelClassification(): EvalResult[] {
+  const results: EvalResult[] = [];
+
+  const cases: Array<{ role: string; jd?: string; expectedLevel: string }> = [
+    { role: 'Software Engineering Intern', expectedLevel: 'internship' },
+    { role: 'Software Engineering Co-op', expectedLevel: 'coop' },
+    { role: 'Software Engineer', expectedLevel: 'experienced' },
+    { role: 'Senior Software Engineer', expectedLevel: 'experienced' },
+    { role: 'Product Manager', expectedLevel: 'experienced' },
+    { role: 'Marketing Analyst', expectedLevel: 'experienced' },
+    {
+      role: 'Software Engineering Intern',
+      jd: 'Looking for a motivated intern for a 12-week summer program.',
+      expectedLevel: 'internship',
+    },
+  ];
+
+  for (const { role, jd, expectedLevel } of cases) {
+    const ctx = classifyEmploymentLevel(role, jd);
+    results.push({
+      name: `employment_level:${role.replace(/\s+/g, '_').toLowerCase()}${jd ? '_with_jd' : ''}`,
+      passed: ctx.level === expectedLevel,
+      details: `expected=${expectedLevel} got=${ctx.level} confidence=${ctx.confidence}`,
+    });
+  }
 
   return results;
 }
@@ -328,6 +365,95 @@ async function evalLiveRoadmapGeneration(): Promise<EvalResult[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Live internship pipeline eval
+// Specifically tests the Software Engineering Intern regression:
+// - Previously triggered truncation due to analyzeGap budget (1024→1536)
+//   and uncontrolled missing_critical size in roadmap prompt
+// - Verifies employment level is correctly classified as 'internship'
+// - Verifies full 8-phase roadmap is generated without truncation
+// ---------------------------------------------------------------------------
+async function evalLiveInternshipPipeline(): Promise<EvalResult[]> {
+  const results: EvalResult[] = [];
+  const { runAnalysis } = await import('../lib/ai');
+
+  const internFixture = RESUME_FIXTURES.find((r) => r.id === 'cs-student-intern')!;
+  const internJD = JOB_FIXTURES.find((j) => j.id === 'software-engineering-intern')!;
+
+  const start = Date.now();
+  try {
+    const result = await runAnalysis(
+      `eval-intern-${internJD.id}`,
+      internFixture.text,
+      internJD.targetRole,
+      internJD.description,
+    );
+    const latencyMs = Date.now() - start;
+
+    // Must have exactly 8 phases (no truncation)
+    results.push({
+      name: `live_intern_roadmap_8_phases`,
+      passed: result.roadmap.length === 8,
+      details: `${result.roadmap.length} phases generated in ${latencyMs}ms`,
+      metric: result.roadmap.length,
+    });
+
+    // Role requirements must parse without demand_level error
+    results.push({
+      name: `live_intern_role_requirements_valid`,
+      passed: result.roleRequirements.required_skills.length > 0,
+      details: `${result.roleRequirements.required_skills.length} required skills, avg_salary=${result.roleRequirements.avg_salary}`,
+      metric: result.roleRequirements.required_skills.length,
+    });
+
+    // demand_level must NOT appear on the validated result (stripped by schema)
+    const hasDemandLevel = 'demand_level' in result.roleRequirements;
+    results.push({
+      name: `live_intern_demand_level_absent`,
+      passed: !hasDemandLevel,
+      details: hasDemandLevel
+        ? 'REGRESSION: demand_level unexpectedly present in validated roleRequirements'
+        : 'demand_level correctly absent from validated result',
+    });
+
+    // Readiness score sanity
+    const score = result.gapAnalysis.readiness_score;
+    results.push({
+      name: `live_intern_readiness_score_valid`,
+      passed: score >= 0 && score <= 100,
+      details: `readiness_score=${score}`,
+      metric: score,
+    });
+
+    // Internship scores should generally be lower than experienced-role scores
+    // (not a hard failure — just a warning metric)
+    results.push({
+      name: `live_intern_score_plausibly_low`,
+      passed: score <= 70, // students typically have significant gaps
+      details: score <= 70 ? `score=${score} (expected ≤70 for student)` : `WARN: score=${score} seems high for a student intern`,
+      metric: score,
+    });
+
+    if (result.pipelineUsage) {
+      results.push({
+        name: `live_intern_usage_reported`,
+        passed: true,
+        details: `tokens=${result.pipelineUsage.totals.totalTokens} latency=${latencyMs}ms cost=$${result.pipelineUsage.totals.estimatedCostUsd.toFixed(6)}`,
+        metric: result.pipelineUsage.totals.totalTokens,
+      });
+    }
+  } catch (err) {
+    const latencyMs = Date.now() - start;
+    results.push({
+      name: `live_intern_pipeline`,
+      passed: false,
+      details: `FAILED after ${latencyMs}ms: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
@@ -340,6 +466,7 @@ async function run(): Promise<void> {
   const allResults: EvalResult[] = [
     ...evalDemoDataIntegrity(),
     ...evalSchemaValidation(),
+    ...evalEmploymentLevelClassification(),
     ...evalProgressionDeterminism(),
   ];
 
@@ -355,6 +482,10 @@ async function run(): Promise<void> {
     console.log('Running live roadmap generation eval (Frontend Developer regression)...\n');
     const roadmapResults = await evalLiveRoadmapGeneration();
     allResults.push(...roadmapResults);
+
+    console.log('Running live internship pipeline eval (Software Engineering Intern regression)...\n');
+    const internResults = await evalLiveInternshipPipeline();
+    allResults.push(...internResults);
   }
 
   const passed = allResults.filter((r) => r.passed).length;
