@@ -17,7 +17,9 @@
 import { sql } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import { isAdminUser } from './auth';
-import { countTotalRecentAnalyses } from './db';
+import { reserveGlobalQuotaSlot, refundGlobalQuotaSlot } from './db';
+export type { GlobalQuotaReservation } from './db';
+export { reserveGlobalQuotaSlot, refundGlobalQuotaSlot };
 
 /** Default monthly quota per user. Override with ANALYSIS_QUOTA_PER_MONTH env var. */
 export const MONTHLY_ANALYSIS_QUOTA = parseInt(
@@ -27,43 +29,17 @@ export const MONTHLY_ANALYSIS_QUOTA = parseInt(
 
 /**
  * Global monthly cap across ALL users combined.
- * Prevents the app from exhausting Groq's free tier (30 RPM, ~500K tokens/day)
- * or Vercel Hobby bandwidth limits due to unexpected traffic spikes.
+ * Counts Groq *request attempts*, not completions, so failed requests that
+ * consumed provider tokens are charged against the budget.
  *
- * Conservative default: 50 analyses/month total (~250 Groq calls, ~375K tokens).
+ * Conservative default: 50 attempts/month (~375K tokens at current model).
  * Override with GLOBAL_MONTHLY_ANALYSIS_QUOTA env var.
- * Admins count toward the global cap but not their own per-user cap.
+ * Admins count toward the global cap but are exempt from per-user caps.
  */
 export const GLOBAL_MONTHLY_ANALYSIS_QUOTA = parseInt(
   process.env.GLOBAL_MONTHLY_ANALYSIS_QUOTA ?? '50',
   10
 );
-
-/**
- * Checks whether the global monthly analysis cap has been reached.
- * Returns { allowed: true } or { allowed: false, message }.
- *
- * Always allows when DATABASE_URL is absent (local dev without DB).
- * Always allows demo flows — this is only called for live analyses.
- */
-export async function checkGlobalQuota(): Promise<{ allowed: boolean; message?: string }> {
-  const db = getDbClient();
-  if (!db) return { allowed: true }; // local dev without DB
-
-  const since = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
-  const total = await countTotalRecentAnalyses(since);
-
-  if (total >= GLOBAL_MONTHLY_ANALYSIS_QUOTA) {
-    return {
-      allowed: false,
-      message:
-        `The service has reached its monthly capacity (${GLOBAL_MONTHLY_ANALYSIS_QUOTA} analyses). ` +
-        'Demo mode is still available. Live analysis will resume next month.',
-    };
-  }
-
-  return { allowed: true };
-}
 
 export interface QuotaStatus {
   allowed:      boolean;

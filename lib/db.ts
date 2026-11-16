@@ -37,6 +37,9 @@ export async function saveAnalysis(
   const db = getDbClient();
   if (!db) return;
 
+  // Upload path: creates the initial row with status='pending'.
+  // Does not use onConflictDoUpdate for status so an in-progress analysis
+  // cannot have its status reset to 'pending' by a stale upload retry.
   await db.insert(analyses).values({
     id,
     userId: options.userId ?? null,
@@ -46,6 +49,7 @@ export async function saveAnalysis(
     readinessScore,
     resultJson,
     isDemoMode: options.isDemoMode ?? false,
+    status: 'pending',
   }).onConflictDoUpdate({
     target: analyses.id,
     set: {
@@ -55,8 +59,134 @@ export async function saveAnalysis(
       readinessScore,
       resultJson,
       isDemoMode: options.isDemoMode ?? false,
+      // Intentionally not resetting status — an in-progress analysis should
+      // not be interrupted by a concurrent upload retry on the same ID.
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// DB-backed idempotency for POST /api/analyze
+// ---------------------------------------------------------------------------
+
+/** Possible outcomes of an atomic claim attempt. */
+export type ClaimResult =
+  | 'claimed'       // successfully transitioned pending → processing; this instance owns it
+  | 'processing'    // another instance is currently processing this analysis
+  | 'complete'      // result already exists; caller should return cached result
+  | 'failed'        // non-retryable failure; user must re-upload
+  | 'unavailable';  // status column not yet migrated; caller should use in-memory fallback
+
+/**
+ * Atomically claims an analysis for processing via a single UPDATE statement.
+ *
+ * Transitions pending → processing, or reclaims a stale processing reservation
+ * (where another instance started > abandonedAfterMs ago and presumably crashed).
+ *
+ * Returns 'unavailable' if the status column does not exist yet (pre-migration
+ * environment) so the caller can degrade gracefully to the in-memory guard.
+ */
+export async function claimAnalysisSlot(
+  id: string,
+  abandonedAfterMs = 120_000,
+): Promise<ClaimResult> {
+  const db = getDbClient();
+  if (!db) return 'claimed'; // local dev without DB
+
+  const abandonedBefore = new Date(Date.now() - abandonedAfterMs);
+
+  try {
+    const result = await db.execute(sql`
+      UPDATE analyses
+         SET status                = 'processing',
+             processing_started_at = NOW()
+       WHERE id = ${id}::uuid
+         AND (
+               status = 'pending'
+               OR (status = 'processing' AND processing_started_at < ${abandonedBefore})
+             )
+    `);
+
+    if ((result.rowCount ?? 0) > 0) return 'claimed';
+
+    // Claim failed — read current status to tell the caller why.
+    const rows = await db.execute(sql`
+      SELECT status FROM analyses WHERE id = ${id}::uuid LIMIT 1
+    `);
+    const row = (rows.rows as Array<{ status: string }>)[0];
+    if (!row) return 'claimed'; // row was deleted mid-request; let caller 404
+    if (row.status === 'complete') return 'complete';
+    if (row.status === 'failed')   return 'failed';
+    return 'processing';
+  } catch {
+    // Column does not exist yet (pre-migration). Fall back gracefully.
+    return 'unavailable';
+  }
+}
+
+/**
+ * Releases a processing claim — sets status back to 'pending' for retryable
+ * failures or to 'failed' for non-retryable ones.
+ * Silent no-op when db is absent or the status column does not exist yet.
+ */
+export async function releaseAnalysisClaim(
+  id: string,
+  toStatus: 'pending' | 'failed' = 'pending',
+): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  try {
+    await db.execute(sql`
+      UPDATE analyses
+         SET status                = ${toStatus},
+             processing_started_at = NULL
+       WHERE id = ${id}::uuid AND status = 'processing'
+    `);
+  } catch { /* status column not yet migrated — silent */ }
+}
+
+/**
+ * Updates the analysis result and marks it complete.
+ * Called instead of saveAnalysis() after a successful Groq pipeline run.
+ */
+export async function updateAnalysisResult(
+  id: string,
+  resumeText: string,
+  targetRole: string,
+  jobDescription: string | null,
+  readinessScore: number,
+  resultJson: string,
+  userId?: string,
+): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  // Try the new path (with status column) first; fall back if not migrated.
+  try {
+    await db.execute(sql`
+      UPDATE analyses
+         SET resume_text        = ${resumeText},
+             target_role        = ${targetRole},
+             job_description    = ${jobDescription ?? null},
+             readiness_score    = ${readinessScore},
+             result_json        = ${resultJson},
+             is_demo_mode       = false,
+             status             = 'complete',
+             processing_started_at = NULL
+       WHERE id = ${id}::uuid
+    `);
+  } catch {
+    // Pre-migration fallback: update without the status columns.
+    await db.update(analyses).set({
+      resumeText,
+      targetRole,
+      jobDescription,
+      readinessScore,
+      resultJson,
+      isDemoMode: false,
+    }).where(and(eq(analyses.id, id), userId ? eq(analyses.userId, userId) : sql`true`));
+  }
 }
 
 export async function getAnalysis(
@@ -314,7 +444,8 @@ export async function countRecentAnalyses(userId: string, since: Date): Promise<
 
 /**
  * Counts all non-demo analyses across every user since `since`.
- * Used for the global monthly safeguard against hitting Groq's free-tier limits.
+ * @deprecated Use reserveGlobalQuotaSlot/refundGlobalQuotaSlot for atomic enforcement.
+ * Retained for backward-compat references only.
  */
 export async function countTotalRecentAnalyses(since: Date): Promise<number> {
   const db = getDbClient();
@@ -331,6 +462,95 @@ export async function countTotalRecentAnalyses(since: Date): Promise<number> {
     );
 
   return rows[0]?.value ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Global Groq request quota — atomic reservation in global_quota_buckets
+// Counts Groq *attempts*, not completions, so failed requests that consumed
+// provider tokens are charged against the monthly budget.
+// ---------------------------------------------------------------------------
+
+export interface GlobalQuotaReservation {
+  allowed:  boolean;
+  used?:    number;
+  limit?:   number;
+  message?: string;
+}
+
+/**
+ * Atomically reserves one global Groq request slot for the current month.
+ *
+ * Uses INSERT ... ON CONFLICT DO UPDATE with a WHERE guard so two concurrent
+ * requests cannot both pass the cap. The global_quota_buckets table must
+ * exist (migration 0002); returns allowed=true when it does not (pre-migration
+ * environments) so callers degrade gracefully rather than hard-failing.
+ */
+export async function reserveGlobalQuotaSlot(limitVal: number): Promise<GlobalQuotaReservation> {
+  const db = getDbClient();
+  if (!db) return { allowed: true }; // local dev without DB
+
+  const bucket = currentMonthBucket();
+
+  try {
+    const result = await db.execute(sql`
+      INSERT INTO global_quota_buckets (bucket_key, count, limit_val)
+      VALUES (${bucket}, 1, ${limitVal})
+      ON CONFLICT (bucket_key)
+      DO UPDATE
+         SET count     = global_quota_buckets.count + 1,
+             limit_val = ${limitVal}
+       WHERE global_quota_buckets.count < ${limitVal}
+      RETURNING count, limit_val
+    `);
+
+    const rows = result.rows as Array<{ count: number; limit_val: number }>;
+    if (rows.length === 0) {
+      // cap reached — read current count for the error message
+      const cur = await db.execute(sql`
+        SELECT count, limit_val FROM global_quota_buckets WHERE bucket_key = ${bucket} LIMIT 1
+      `);
+      const r = (cur.rows as Array<{ count: number; limit_val: number }>)[0];
+      return {
+        allowed: false,
+        used:    r?.count ?? limitVal,
+        limit:   r?.limit_val ?? limitVal,
+        message:
+          `The service has reached its monthly capacity (${r?.limit_val ?? limitVal} analyses). ` +
+          'Demo mode is still available. Live analysis will resume next month.',
+      };
+    }
+
+    return { allowed: true, used: rows[0].count, limit: rows[0].limit_val };
+  } catch {
+    // Table does not exist yet (pre-migration). Allow through — the per-user
+    // quota remains authoritative for per-user limits.
+    return { allowed: true };
+  }
+}
+
+/**
+ * Refunds one global slot — called when Groq never completed (timeout, network
+ * error, validation failure). Silent no-op when table is absent.
+ */
+export async function refundGlobalQuotaSlot(): Promise<void> {
+  const db = getDbClient();
+  if (!db) return;
+
+  const bucket = currentMonthBucket();
+  try {
+    await db.execute(sql`
+      UPDATE global_quota_buckets
+         SET count = GREATEST(count - 1, 0)
+       WHERE bucket_key = ${bucket}
+    `);
+  } catch { /* pre-migration — silent */ }
+}
+
+function currentMonthBucket(): string {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
 }
 
 // ---------------------------------------------------------------------------

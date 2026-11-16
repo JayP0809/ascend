@@ -115,11 +115,35 @@ export default function PrivacyPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-medium text-primary mb-3">8. Contact</h2>
+            <h2 className="text-lg font-medium text-primary mb-3">8. Cookies and Tracking</h2>
             <p>
-              Questions about this policy? This project is a portfolio application. For questions,
-              open an issue on the project repository or reach out through the contact information
-              listed on the project page.
+              Ascend uses session cookies set by Auth.js to maintain your sign-in state. No
+              third-party advertising or cross-site tracking cookies are used. No analytics
+              service that tracks individual users is currently deployed. If analytics are added
+              in the future, this policy will be updated before they are enabled.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-medium text-primary mb-3">9. Data Limitations</h2>
+            <p>
+              Ascend is a portfolio application, not a commercial service. Data is stored in a
+              cloud database (Neon PostgreSQL) on servers in the United States. We do not have
+              a formal data processing agreement in place for GDPR or CCPA compliance. If you
+              have concerns about your data, please use the account deletion feature to remove
+              all records associated with your account.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-medium text-primary mb-3">10. Contact</h2>
+            <p>
+              This project is a portfolio application. The developer&apos;s contact information
+              is not published here. For questions, open an issue on the project&apos;s GitHub
+              repository.
+            </p>
+            <p className="mt-2 text-xs text-secondary/70">
+              [Owner: add GitHub repository link and/or contact email here before public launch.]
             </p>
           </div>
 

@@ -35,18 +35,26 @@ export const users = pgTable('users', {
 // resume_text stores the truncated extracted text — raw file is never kept.
 // ---------------------------------------------------------------------------
 export const analyses = pgTable('analyses', {
-  id:             uuid('id').primaryKey(),
-  userId:         uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  resumeText:     text('resume_text').notNull().default(''),
-  targetRole:     text('target_role').notNull(),
-  jobDescription: text('job_description'),
-  readinessScore: real('readiness_score').notNull().default(0),
-  resultJson:     text('result_json').notNull().default('{}'),
-  isDemoMode:     boolean('is_demo_mode').notNull().default(false),
-  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  id:                   uuid('id').primaryKey(),
+  userId:               uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  resumeText:           text('resume_text').notNull().default(''),
+  targetRole:           text('target_role').notNull(),
+  jobDescription:       text('job_description'),
+  readinessScore:       real('readiness_score').notNull().default(0),
+  resultJson:           text('result_json').notNull().default('{}'),
+  isDemoMode:           boolean('is_demo_mode').notNull().default(false),
+  createdAt:            timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Request-state tracking (added in migration 0002).
+  // pending    → uploaded, waiting for /api/analyze call
+  // processing → an instance has claimed this for Groq processing
+  // complete   → result_json is populated and final
+  // failed     → non-retryable error; user must re-upload
+  status:               text('status').notNull().default('pending'),
+  processingStartedAt:  timestamp('processing_started_at', { withTimezone: true }),
 }, (t) => [
   index('analyses_user_id_idx').on(t.userId),
   index('analyses_created_at_idx').on(t.createdAt),
+  index('analyses_status_processing_idx').on(t.status, t.processingStartedAt),
 ]);
 
 // ---------------------------------------------------------------------------
@@ -142,6 +150,20 @@ export const usageBuckets = pgTable('usage_buckets', {
   primaryKey({ columns: [t.userId, t.bucketKey], name: 'usage_buckets_pk' }),
   index('usage_buckets_user_id_idx').on(t.userId),
 ]);
+
+// ---------------------------------------------------------------------------
+// global_quota_buckets
+// One row per calendar month ('YYYY-MM'). Tracks the total number of Groq
+// requests attempted across ALL users — intentionally counts attempts, not
+// completions, so failed requests that consumed provider tokens are charged.
+// Atomic INSERT ... ON CONFLICT DO UPDATE prevents concurrent requests from
+// both passing the cap check before either increments the counter.
+// ---------------------------------------------------------------------------
+export const globalQuotaBuckets = pgTable('global_quota_buckets', {
+  bucketKey: text('bucket_key').primaryKey(),   // 'YYYY-MM'
+  count:     integer('count').notNull().default(0),
+  limitVal:  integer('limit_val').notNull().default(50),
+});
 
 // ---------------------------------------------------------------------------
 // Relations (for Drizzle query builder joins)

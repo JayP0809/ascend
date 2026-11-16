@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
+import { getAnalysis, saveCommunityEntry, claimAnalysisSlot, releaseAnalysisClaim, updateAnalysisResult } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, AUTH_CONFIGURED } from '@/lib/auth';
-import { reserveQuotaSlot, refundQuotaSlot, checkGlobalQuota } from '@/lib/quota';
+import { reserveQuotaSlot, refundQuotaSlot, reserveGlobalQuotaSlot, refundGlobalQuotaSlot, GLOBAL_MONTHLY_ANALYSIS_QUOTA } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,23 +12,18 @@ import { v4 as uuidv4 } from 'uuid';
 // The AI pipeline runs 5 sequential/parallel Groq calls; typical latency is
 // 15-30 seconds. If Groq is slow or retrying, the function may hit this limit.
 // Users see a timeout error and their quota slot is refunded automatically.
+// See docs/production-architecture-proposal.md for latency analysis.
 export const maxDuration = 60;
 
 // ---------------------------------------------------------------------------
-// In-flight dedup guard
-// Best-effort protection against double-click / duplicate concurrent requests
-// within the same serverless function instance. On Vercel, concurrent requests
-// may land on different instances and bypass this guard — the per-user quota
-// reservation (atomic SQL) is the authoritative protection against double-spend.
-// A Redis-backed lock would eliminate the cross-instance gap but adds a paid
-// dependency; not warranted for a portfolio-scale deployment.
+// In-memory dedup guard (fallback for pre-migration environments)
+// When the status column is available (migration 0002 applied), claimAnalysisSlot()
+// provides atomic cross-instance dedup via PostgreSQL. This Set is only used
+// when that column is not yet present — it cannot guard across Vercel instances.
 // ---------------------------------------------------------------------------
 const inFlightAnalyses = new Set<string>();
 
 const analyzeBodySchema = z.object({
-  // Accept a real UUID for authenticated live-mode analyses, OR a demo-* prefixed
-  // ID for public demo flows.  Real UUID validation is NOT weakened — the union
-  // only adds the well-scoped demo prefix pattern.
   analysisId: z.union([
     z.string().uuid(),
     z.string().regex(/^demo-[a-z0-9-]+$/i, 'Invalid analysis ID format'),
@@ -55,14 +50,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const isDemoFlow = !isLiveMode() || !!analysisId?.startsWith('demo-');
 
   // Demo flows bypass all authentication, quota, and dedup checks.
-  // Demo analyses are stateless and always served from getDemoData() — no DB save.
   if (isDemoFlow) {
     const result = getDemoData(analysisId || uuidv4(), targetRole);
     const dashboard = buildDashboardData(result);
     return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
   }
 
-  // Live flow requires a session when Clerk is configured OR fail-closed in production.
+  // Live flow requires a session when Auth.js is configured OR fail-closed in production.
   const user = await getCurrentUser(request);
 
   if (!DEV_BYPASS_ACTIVE && !user) {
@@ -82,63 +76,90 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis ID is required for live mode' }, { status: 400 });
   }
 
-  // Fetch the analysis record BEFORE reserving a quota slot.
-  // A "not found" or "already in-flight" error must not burn quota.
+  // Fetch the analysis record BEFORE any quota or dedup reservation.
+  // Not-found and ownership failures must not burn quota or global slots.
   const existing = await getAnalysis(analysisId);
   if (!existing) {
-    return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
+    return NextResponse.json({ error: 'Analysis not found. Please upload your resume again.' }, { status: 404 });
   }
 
-  // Ownership check: the requesting user must own the upload record.
-  // Prevents one authenticated user from running analysis on another user's
-  // resume text (even though analysisId UUIDs are unguessable, we enforce this
-  // at the authorization layer rather than relying on secrecy alone).
-  // In dev mode DEV_BYPASS_ACTIVE = true so checkAnalysisAccess grants all.
+  // Ownership check: the requesting user must own this record.
+  // Enforced before any cached-result short-circuit so we do not leak another
+  // user's completed analysis through the retry path.
   const uploadAccess = checkAnalysisAccess(existing, user);
   if (!uploadAccess.granted) {
     return NextResponse.json({ error: uploadAccess.message }, { status: uploadAccess.status });
   }
 
-  // Short-circuit: if this analysis already has a completed result, return it
-  // immediately without consuming quota or calling Groq again. Handles retries,
-  // duplicate POSTs, and recovery from abandoned in-flight reservations.
-  if (existing.result_json && existing.result_json !== '{}') {
-    try {
-      const cached: AnalysisResult = JSON.parse(existing.result_json);
-      if (cached.skillExtraction) {
-        const dashboard = buildDashboardData(cached);
-        return NextResponse.json({ analysisId: existing.id, dashboard, isDemoMode: false });
-      }
-    } catch { /* result_json is not yet complete — fall through to normal analysis */ }
+  // ── Idempotency: atomic DB claim (Items 2 & 3) ────────────────────────────
+  // claimAnalysisSlot() does a single atomic UPDATE pending→processing.
+  // It also re-claims stale 'processing' rows (another instance crashed).
+  // Returns 'complete' or 'failed' when the row is already in a terminal state.
+  const claim = await claimAnalysisSlot(analysisId);
+
+  if (claim === 'complete') {
+    // Another instance completed this analysis while we were waiting — return
+    // the cached result rather than running Groq again.
+    const recheckRecord = await getAnalysis(analysisId);
+    if (recheckRecord?.result_json && recheckRecord.result_json !== '{}') {
+      try {
+        const cached: AnalysisResult = JSON.parse(recheckRecord.result_json);
+        if (cached.skillExtraction) {
+          return NextResponse.json({ analysisId: recheckRecord.id, dashboard: buildDashboardData(cached), isDemoMode: false });
+        }
+      } catch { /* fall through to re-run */ }
+    }
   }
 
-  // Global safeguard: cap total live analyses across all users to protect
-  // Groq's free-tier limits and prevent unexpected traffic spikes.
-  // Check AFTER auth so unauthenticated requests are rejected first (401),
-  // and BEFORE per-user quota so the error message is actionable.
-  const globalQuota = await checkGlobalQuota();
-  if (!globalQuota.allowed) {
+  if (claim === 'failed') {
     return NextResponse.json(
-      { error: globalQuota.message ?? 'Service temporarily unavailable. Please try demo mode or check back tomorrow.' },
-      { status: 503 }
-    );
-  }
-
-  // Dedup: reject a second concurrent request for the same analysis ID.
-  if (inFlightAnalyses.has(analysisId)) {
-    return NextResponse.json(
-      { error: 'An analysis is already in progress for this resume. Please wait for it to complete.' },
+      { error: 'A previous analysis attempt failed permanently. Please upload your resume again.' },
       { status: 409 }
     );
   }
 
-  // Atomically reserve a quota slot.  Admin accounts bypass the monthly limit
-  // but their usage is still tracked.  The slot is REFUNDED (decremented) if
-  // Groq subsequently fails — the user gets no value, so they should not pay
-  // quota.  The slot is NOT refunded when Groq succeeds but a DB write fails
-  // afterward, since the AI tokens were consumed regardless.
+  if (claim === 'processing') {
+    return NextResponse.json(
+      { error: 'An analysis is already in progress for this resume. Please wait a moment, then refresh.' },
+      { status: 409, headers: { 'Retry-After': '30' } }
+    );
+  }
+
+  // 'unavailable': status column not yet migrated. Fall back to in-memory guard.
+  const usingFallbackDedup = claim === 'unavailable';
+  if (usingFallbackDedup) {
+    if (inFlightAnalyses.has(analysisId)) {
+      return NextResponse.json(
+        { error: 'An analysis is already in progress for this resume. Please wait a moment, then refresh.' },
+        { status: 409 }
+      );
+    }
+    inFlightAnalyses.add(analysisId);
+  }
+
+  // ── Global Groq budget (Item 1) ───────────────────────────────────────────
+  // Atomically reserve one global slot BEFORE calling Groq.
+  // Counts attempts, not completions — failed requests that consumed provider
+  // tokens still use the budget. Refunded on network/timeout errors that do
+  // not reach Groq at all; NOT refunded on model validation failures (tokens
+  // were consumed even if the structured output was malformed).
+  const globalReservation = await reserveGlobalQuotaSlot(GLOBAL_MONTHLY_ANALYSIS_QUOTA);
+  if (!globalReservation.allowed) {
+    // Release the analysis claim so the user could retry next month.
+    await releaseAnalysisClaim(analysisId, 'pending');
+    if (usingFallbackDedup) inFlightAnalyses.delete(analysisId);
+    return NextResponse.json(
+      { error: globalReservation.message ?? 'Service temporarily unavailable. Please try demo mode or check back tomorrow.' },
+      { status: 503 }
+    );
+  }
+
+  // ── Per-user quota (atomic) ───────────────────────────────────────────────
   const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.email);
   if (!quota.allowed) {
+    await releaseAnalysisClaim(analysisId, 'pending');
+    await refundGlobalQuotaSlot();
+    if (usingFallbackDedup) inFlightAnalyses.delete(analysisId);
     return NextResponse.json(
       { error: quota.message ?? 'Monthly analysis quota exceeded.' },
       { status: 429 }
@@ -150,24 +171,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // ── AI pipeline ────────────────────────────────────────────────────────────
-  // Track whether Groq returned a usable result so the catch block knows
-  // whether to refund the quota slot.
-  inFlightAnalyses.add(analysisId);
   let groqSucceeded = false;
   try {
     const result = await runAnalysis(analysisId, existing.resume_text, targetRole, jobDescription);
-    groqSucceeded = true; // past this line: AI tokens were consumed
+    groqSucceeded = true; // AI tokens consumed past this point
 
     const dashboard = buildDashboardData(result);
 
-    await saveAnalysis(
+    await updateAnalysisResult(
       result.analysisId,
       result.skillExtraction.current_skills.join(', '),
       targetRole,
       jobDescription ?? null,
       result.gapAnalysis.readiness_score,
       JSON.stringify(result),
-      { isDemoMode: false, userId: user?.userId }
+      user?.userId,
     );
 
     // Anonymized community entry — fire and forget
@@ -178,48 +196,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: false });
 
   } catch (error) {
-    // Refund only when Groq never completed successfully.
-    // DB write failures after a successful Groq response do NOT get a refund —
-    // the AI tokens were consumed and the user may retry the DB save.
+    // Determine what to refund and what state to leave the analysis in.
+    const isRetryable =
+      error instanceof GroqTimeoutError  ||
+      error instanceof RoadmapAssemblyError;
+
+    const isNonRetryable = error instanceof GroqTruncationError;
+
+    // Refund Groq budget and per-user slot only when Groq never completed.
+    // We do NOT refund on successful Groq + failed DB write, because AI
+    // tokens were consumed regardless of the DB error.
     if (!groqSucceeded) {
       refundQuotaSlot(user?.userId ?? null).catch(() => {});
+      // Refund global slot only for genuine network/timeout errors — not for
+      // validation failures (the model ran and consumed tokens).
+      if (isRetryable) {
+        refundGlobalQuotaSlot().catch(() => {});
+      }
     }
+
+    // Reset analysis state so the user can retry (retryable), or mark as failed
+    // so we don't attempt an obviously broken analysis again (non-retryable).
+    await releaseAnalysisClaim(analysisId, isNonRetryable ? 'failed' : 'pending');
+    if (usingFallbackDedup) inFlightAnalyses.delete(analysisId);
 
     if (error instanceof GroqTimeoutError) {
       return NextResponse.json(
-        {
-          error: error.message,
-          retryable: true,
-          hint: 'The AI service took too long. Your quota slot was refunded — you can try again.',
-        },
+        { error: error.message, retryable: true, hint: 'Your quota slot was refunded — you can try again.' },
         { status: 504 }
       );
     }
     if (error instanceof GroqTruncationError) {
       return NextResponse.json(
-        {
-          error: 'The AI response was too long and got cut off. Please report this issue.',
-          retryable: false,
-        },
+        { error: 'The AI response was cut off (token limit). Please report this issue.', retryable: false },
         { status: 500 }
       );
     }
     if (error instanceof RoadmapAssemblyError) {
       return NextResponse.json(
-        {
-          error: 'Roadmap generation produced an inconsistent result. Please try again.',
-          retryable: true,
-        },
+        { error: 'Roadmap generation produced an inconsistent result. Please try again.', retryable: true },
         { status: 500 }
       );
     }
     if (error instanceof GroqValidationError) {
       return NextResponse.json(
-        {
-          error: error.message,
-          retryable: true,
-          hint: 'Your quota slot was refunded — you can try again.',
-        },
+        { error: error.message, retryable: true, hint: 'Your quota slot was refunded — you can try again.' },
         { status: 500 }
       );
     }
@@ -228,7 +249,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   } finally {
-    inFlightAnalyses.delete(analysisId);
+    if (usingFallbackDedup) inFlightAnalyses.delete(analysisId);
   }
 }
 
@@ -240,7 +261,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis ID required' }, { status: 400 });
   }
 
-  // Demo IDs are served from in-memory data — no DB lookup, no auth required.
   if (id.startsWith('demo-')) {
     const result = getDemoData(id);
     return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(result), isDemoMode: true });

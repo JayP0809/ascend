@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { signIn } from '@/lib/auth-config';
 import { isSafeCallbackUrl } from '@/lib/auth';
 
@@ -70,6 +71,15 @@ export default async function SignInPage({
         <p className="text-center text-xs text-secondary">
           By signing in, your resume text will be processed by Groq&apos;s AI API.
           We do not store your resume text beyond what is needed for the analysis.
+          See our{' '}
+          <Link href="/privacy" className="underline-offset-2 hover:underline text-secondary">
+            Privacy Policy
+          </Link>{' '}
+          and{' '}
+          <Link href="/terms" className="underline-offset-2 hover:underline text-secondary">
+            Terms of Service
+          </Link>
+          .
         </p>
       </div>
     </main>
