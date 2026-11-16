@@ -532,11 +532,11 @@ describe('quota refund — pure logic (no DB)', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('refundQuotaSlot accepts optional clerkId without throwing', async () => {
+  it('refundQuotaSlot accepts optional email parameter without throwing', async () => {
     if (HAS_DB) return;
     const { refundQuotaSlot } = await import('./quota');
     await expect(
-      refundQuotaSlot('aaaaaaaa-0000-0000-0000-000000000001', 'clerk_someuser')
+      refundQuotaSlot('aaaaaaaa-0000-0000-0000-000000000001', 'user@example.com')
     ).resolves.toBeUndefined();
   });
 });
@@ -653,6 +653,84 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
   });
 });
 
+// ---------------------------------------------------------------------------
+// 8. upsertUser — atomic insert prevents duplicate creation
+// ---------------------------------------------------------------------------
+
+describe('upsertUser — atomic upsert (no DB, documents expected behavior)', () => {
+  it('upsertUser throws when DATABASE_URL is absent (db unavailable)', async () => {
+    if (HAS_DB) return; // DB tests covered in [integration] section below
+    const { upsertUser } = await import('./db');
+    await expect(upsertUser('google_sub_123', 'test@example.com')).rejects.toThrow(
+      'Database not available',
+    );
+  });
+});
+
+describe.skipIf(!HAS_DB)(
+  '[integration] upsertUser — concurrent first-sign-in race condition',
+  () => {
+    it('concurrent upserts for the same provider ID return the same UUID', async () => {
+      // Regression test for the SELECT-then-INSERT race: two simultaneous
+      // sign-ins for the same Google account must both resolve to the same
+      // internal user ID without throwing a unique-constraint violation.
+      const { upsertUser } = await import('./db');
+      const providerId = `google_sub_concurrent_${Date.now()}`;
+      const email = `${providerId}@test.local`;
+
+      const [id1, id2, id3] = await Promise.all([
+        upsertUser(providerId, email, 'Test User'),
+        upsertUser(providerId, email, 'Test User'),
+        upsertUser(providerId, email, 'Test User'),
+      ]);
+
+      expect(id1).toBe(id2);
+      expect(id1).toBe(id3);
+      expect(typeof id1).toBe('string');
+      expect(id1.length).toBeGreaterThan(0);
+    });
+
+    it('repeated upserts with updated email return the same UUID', async () => {
+      const { upsertUser } = await import('./db');
+      const providerId = `google_sub_update_${Date.now()}`;
+
+      const id1 = await upsertUser(providerId, 'old@example.com');
+      const id2 = await upsertUser(providerId, 'new@example.com'); // email changed
+      expect(id1).toBe(id2); // same user, email updated
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// 9. POST /api/analyze upload ownership — checkAnalysisAccess called for uploads
+// ---------------------------------------------------------------------------
+
+describe('POST /api/analyze — upload ownership enforcement', () => {
+  it('checkAnalysisAccess is called with the existing upload record shape', () => {
+    // Unit-level: verify the ownership logic handles the analysis record shape.
+    // Simulates what POST /api/analyze does before running the AI pipeline.
+    // With Auth.js configured this would deny cross-user access.
+
+    // User owns their record → granted
+    const owner = { userId: 'alice', providerId: 'g_sub_alice', email: 'alice@test.com' };
+    const owned = { user_id: 'alice' };
+    expect(checkAnalysisAccess(owned, owner).granted).toBe(true);
+
+    // In dev mode (no Auth.js) any record is accessible — dev bypass.
+    // We document here that in production (HAS_AUTH=true) cross-user is 404.
+    if (HAS_AUTH) {
+      const other = { userId: 'bob', providerId: 'g_sub_bob', email: 'bob@test.com' };
+      const result = checkAnalysisAccess(owned, other);
+      expect(result.granted).toBe(false);
+      expect((result as { granted: false; status: number }).status).toBe(404);
+
+      const ownerless = { user_id: null };
+      const ownerlessResult = checkAnalysisAccess(ownerless, owner);
+      expect(ownerlessResult.granted).toBe(false);
+    }
+  });
+});
+
 /*
  * [live-auth] Tests that cannot run without Auth.js + Google OAuth configuration.
  * Manual verification steps for post-deployment testing:
@@ -662,21 +740,30 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
  *    Sign in as user B. GET /api/analyze?id=<A's id> → expect 404.
  *    GET /api/export?id=<A's id> → expect 404.
  *
- * 2. Ownerless record access:
+ * 2. Cross-user write (upload ownership):
+ *    Sign in as user A. Upload → get analysisId.
+ *    Sign out, sign in as user B. POST /api/analyze with A's analysisId → expect 404.
+ *    Verify quota was NOT consumed for this rejected request.
+ *
+ * 3. Ownerless record access:
  *    With a record seeded in DB without user_id, authenticated user
  *    GET /api/analyze?id=<ownerless-id> → expect 404.
+ *    POST /api/analyze with ownerless analysisId → expect 404 (upload ownership check).
  *
- * 3. Unauthenticated live POST:
+ * 4. Unauthenticated live POST:
  *    No session cookie. POST /api/analyze with live analysisId → expect 401.
  *    Verify quota row was NOT created for this request.
  *
- * 4. Client-supplied userId ignored:
+ * 5. Client-supplied userId ignored:
  *    POST /api/analyze with body { userId: 'other-user-id', analysisId: ... }
  *    Server must derive identity from Auth.js JWT session only.
  *    Verify the saved analysis is bound to the session user, not 'other-user-id'.
  *
- * 5. Production misconfiguration (503):
+ * 6. Production misconfiguration (503):
  *    Deploy with AUTH_SECRET absent, NODE_ENV=production.
  *    GET /api/analyze?id=<real-uuid> → expect 503.
  *    GET /api/analyze?id=demo-sample → expect 200 (demo still works).
+ *
+ * 7. Concurrent first sign-in (covered by [integration] upsertUser test above):
+ *    Two tabs signing in simultaneously must both resolve to the same user UUID.
  */

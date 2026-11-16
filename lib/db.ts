@@ -250,20 +250,21 @@ export async function upsertUser(clerkId: string, email: string, name?: string):
   const db = getDbClient();
   if (!db) throw new Error('Database not available');
 
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-
-  if (existing[0]) return existing[0].id;
-
-  const inserted = await db
+  // Atomic INSERT ... ON CONFLICT DO UPDATE prevents duplicate rows when two
+  // concurrent first-sign-ins arrive for the same provider account.
+  // The SELECT-then-INSERT pattern would let both see "no existing row" and
+  // then race to INSERT, causing one to fail with a unique-constraint violation
+  // that propagates as an unhandled error in the JWT callback.
+  const result = await db
     .insert(users)
     .values({ clerkId, email, name })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: { email, updatedAt: new Date() },
+    })
     .returning({ id: users.id });
 
-  return inserted[0].id;
+  return result[0].id;
 }
 
 export async function getUserByClerkId(

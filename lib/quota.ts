@@ -39,15 +39,17 @@ export interface QuotaStatus {
  * Returns allowed=true only if the slot was successfully reserved.
  *
  * Always returns allowed=true for demo flows (isDemoFlow=true) or when
- * userId is null (unauthenticated — before Clerk is configured).
+ * userId is null (unauthenticated — before Auth.js is configured).
  *
- * When clerkId matches ADMIN_CLERK_USER_ID, the slot is tracked but the
- * monthly limit is not enforced. adminExempt=true is set on the result.
- * clerkId MUST come from getCurrentUser() — never from client input.
+ * When email matches ADMIN_EMAIL, the slot is tracked but the monthly limit
+ * is not enforced. adminExempt=true is set on the result.
  *
  * When DATABASE_URL is absent, falls back to in-memory check (always allowed
  * since there is no persistent user to track). This is safe: in-memory
  * quota only matters when a live database is present.
+ *
+ * email MUST come from getCurrentUser() (a server-verified JWT session),
+ * never from the request body or any client-controlled source.
  */
 export async function reserveQuotaSlot(
   userId: string | null,

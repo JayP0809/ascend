@@ -16,7 +16,7 @@
  */
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
-import { getUserByClerkId, upsertUser } from './db';
+import { upsertUser } from './db';
 
 // In local dev without AUTH_SECRET, use a placeholder so NextAuth initializes
 // without throwing. No real sessions are created when Google credentials are
@@ -45,23 +45,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, account }) {
       // `account` is only present on first sign-in; subsequent calls receive
       // an already-populated token with userId and providerId set.
+      // `account` is populated only on the initial sign-in; not on token
+      // refresh. upsertUser is atomic (INSERT ... ON CONFLICT DO UPDATE) so
+      // concurrent first-sign-ins for the same provider account are safe.
       if (account?.providerAccountId) {
         try {
-          const existing = await getUserByClerkId(account.providerAccountId);
-          if (existing) {
-            token.userId     = existing.id;
-            token.providerId = account.providerAccountId;
-          } else {
-            const userId = await upsertUser(
-              account.providerAccountId,
-              (token.email as string) ?? '',
-              (token.name as string | undefined) ?? undefined,
-            );
-            token.userId     = userId;
-            token.providerId = account.providerAccountId;
-          }
+          const userId = await upsertUser(
+            account.providerAccountId,
+            (token.email as string) ?? '',
+            (token.name as string | undefined) ?? undefined,
+          );
+          token.userId     = userId;
+          token.providerId = account.providerAccountId;
         } catch (err) {
-          console.error('[auth] jwt callback failed to upsert user:', err);
+          console.error('[auth] jwt callback: upsertUser failed:', err);
+          // token.userId is left unset — getCurrentUser() returns null,
+          // which is handled as "unauthenticated" by route handlers.
         }
       }
       return token;

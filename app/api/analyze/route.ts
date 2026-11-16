@@ -81,6 +81,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis not found. Please upload resume again.' }, { status: 404 });
   }
 
+  // Ownership check: the requesting user must own the upload record.
+  // Prevents one authenticated user from running analysis on another user's
+  // resume text (even though analysisId UUIDs are unguessable, we enforce this
+  // at the authorization layer rather than relying on secrecy alone).
+  // In dev mode DEV_BYPASS_ACTIVE = true so checkAnalysisAccess grants all.
+  const uploadAccess = checkAnalysisAccess(existing, user);
+  if (!uploadAccess.granted) {
+    return NextResponse.json({ error: uploadAccess.message }, { status: uploadAccess.status });
+  }
+
   // Dedup: reject a second concurrent request for the same analysis ID.
   if (inFlightAnalyses.has(analysisId)) {
     return NextResponse.json(
