@@ -312,6 +312,27 @@ export async function countRecentAnalyses(userId: string, since: Date): Promise<
   return rows[0]?.value ?? 0;
 }
 
+/**
+ * Counts all non-demo analyses across every user since `since`.
+ * Used for the global monthly safeguard against hitting Groq's free-tier limits.
+ */
+export async function countTotalRecentAnalyses(since: Date): Promise<number> {
+  const db = getDbClient();
+  if (!db) return 0;
+
+  const rows = await db
+    .select({ value: count() })
+    .from(analyses)
+    .where(
+      and(
+        gte(analyses.createdAt, since),
+        eq(analyses.isDemoMode, false)
+      )
+    );
+
+  return rows[0]?.value ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // Legacy synchronous shim — kept for internal transition period.
 // The old `db` export is replaced by named async functions above.

@@ -4,16 +4,24 @@ import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, AUTH_CONFIGURED } from '@/lib/auth';
-import { reserveQuotaSlot, refundQuotaSlot } from '@/lib/quota';
+import { reserveQuotaSlot, refundQuotaSlot, checkGlobalQuota } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
+// Tell Vercel to allow up to 60 seconds for this route (Hobby tier maximum).
+// The AI pipeline runs 5 sequential/parallel Groq calls; typical latency is
+// 15-30 seconds. If Groq is slow or retrying, the function may hit this limit.
+// Users see a timeout error and their quota slot is refunded automatically.
+export const maxDuration = 60;
+
 // ---------------------------------------------------------------------------
 // In-flight dedup guard
-// Prevents double-click / duplicate concurrent submissions from burning two
-// quota slots for the same analysis ID.  In-process only — a module-level
-// Set is sufficient for local dev and a single-process server.  For
-// serverless multi-process environments this would need Upstash Redis.
+// Best-effort protection against double-click / duplicate concurrent requests
+// within the same serverless function instance. On Vercel, concurrent requests
+// may land on different instances and bypass this guard — the per-user quota
+// reservation (atomic SQL) is the authoritative protection against double-spend.
+// A Redis-backed lock would eliminate the cross-instance gap but adds a paid
+// dependency; not warranted for a portfolio-scale deployment.
 // ---------------------------------------------------------------------------
 const inFlightAnalyses = new Set<string>();
 
@@ -89,6 +97,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const uploadAccess = checkAnalysisAccess(existing, user);
   if (!uploadAccess.granted) {
     return NextResponse.json({ error: uploadAccess.message }, { status: uploadAccess.status });
+  }
+
+  // Short-circuit: if this analysis already has a completed result, return it
+  // immediately without consuming quota or calling Groq again. Handles retries,
+  // duplicate POSTs, and recovery from abandoned in-flight reservations.
+  if (existing.result_json && existing.result_json !== '{}') {
+    try {
+      const cached: AnalysisResult = JSON.parse(existing.result_json);
+      if (cached.skillExtraction) {
+        const dashboard = buildDashboardData(cached);
+        return NextResponse.json({ analysisId: existing.id, dashboard, isDemoMode: false });
+      }
+    } catch { /* result_json is not yet complete — fall through to normal analysis */ }
+  }
+
+  // Global safeguard: cap total live analyses across all users to protect
+  // Groq's free-tier limits and prevent unexpected traffic spikes.
+  // Check AFTER auth so unauthenticated requests are rejected first (401),
+  // and BEFORE per-user quota so the error message is actionable.
+  const globalQuota = await checkGlobalQuota();
+  if (!globalQuota.allowed) {
+    return NextResponse.json(
+      { error: globalQuota.message ?? 'Service temporarily unavailable. Please try demo mode or check back tomorrow.' },
+      { status: 503 }
+    );
   }
 
   // Dedup: reject a second concurrent request for the same analysis ID.
