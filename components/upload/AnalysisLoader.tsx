@@ -55,7 +55,7 @@ export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) 
   if (timedOut) {
     return (
       <div className="py-8 px-4 text-center">
-        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4" style={{ background: 'var(--accent-light)' }}>
+        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4" style={{ background: 'var(--bg-secondary)' }}>
           <AlertTriangle className="h-8 w-8" style={{ color: 'var(--accent)' }} />
         </div>
         <h3 className="text-lg font-semibold text-primary mb-2">Analysis timed out</h3>
@@ -67,7 +67,7 @@ export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) 
   return (
     <div className="py-8 px-4">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-accent-light mb-4">
+        <div className="inline-flex items-center justify-center h-16 w-16 rounded-full mb-4" style={{ background: 'var(--bg-secondary)' }}>
           <Loader2 className="h-8 w-8 text-accent animate-spin" />
         </div>
         <h3 className="text-lg font-semibold text-primary">Analyzing your profile</h3>

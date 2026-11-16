@@ -18,8 +18,8 @@ function importanceBadge(importance: SkillGapItem['importance']) {
   const map = {
     critical: { variant: 'default', label: 'Critical' },
     'nice-to-have': { variant: 'default', label: 'Nice to have' },
-    transferable: { variant: 'accent', label: 'Transferable' },
-    has: { variant: 'accent', label: 'You have it' },
+    transferable: { variant: 'success', label: 'Transferable' },
+    has: { variant: 'success', label: 'You have it' },
   } as const;
   const { variant, label } = map[importance];
   return <Badge variant={variant}>{label}</Badge>;
@@ -69,7 +69,7 @@ export function SkillGapTab({ data }: SkillGapTabProps) {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filter === f ? 'bg-accent text-white' : 'bg-background text-secondary hover:text-primary border border-border'
+                filter === f ? 'bg-accent text-accent-fg' : 'bg-background text-secondary hover:text-primary border border-border'
               }`}
             >
               {f}
@@ -109,7 +109,7 @@ export function SkillGapTab({ data }: SkillGapTabProps) {
               </div>
               {skill.importance === 'critical' && (
                 <div className="flex items-center gap-1 mt-auto pt-1">
-                  <span className="text-xs text-accent bg-accent-light px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="text-xs px-2 py-0.5 rounded flex items-center gap-1 border" style={{ border: '1px solid var(--emerald)', background: 'var(--emerald-light)', color: 'var(--emerald-text)' }}>
                     <ArrowUpRight className="h-3 w-3" />
                     Added to roadmap
                   </span>

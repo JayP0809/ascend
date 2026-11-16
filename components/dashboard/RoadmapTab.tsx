@@ -90,7 +90,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
             className={clsx(
               'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
               phaseFilter === f
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-accent-fg'
                 : 'bg-background text-secondary hover:text-primary border border-border'
             )}
           >
@@ -113,13 +113,16 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
             return (
               <div key={globalIndex} className="relative pl-10">
                 {/* Timeline dot */}
-                <div className={clsx(
-                  'absolute left-0 top-5 h-10 w-10 rounded-full border-2 flex items-center justify-center z-10 transition-all',
-                  isDone ? 'bg-accent border-accent' :
-                  isCurrent ? 'bg-card border-accent' : 'bg-card border-border'
-                )}>
+                <div
+                  className={clsx(
+                    'absolute left-0 top-5 h-10 w-10 rounded-full border-2 flex items-center justify-center z-10 transition-all',
+                    isDone ? 'border-[var(--emerald)]' :
+                    isCurrent ? 'bg-card border-accent' : 'bg-card border-border'
+                  )}
+                  style={isDone ? { background: 'var(--emerald)' } : undefined}
+                >
                   {isDone ? (
-                    <CheckCircle className="h-5 w-5 text-white" />
+                    <CheckCircle className="h-5 w-5" style={{ color: 'var(--bg-primary)' }} />
                   ) : isCurrent ? (
                     <Circle className="h-4 w-4 text-accent fill-accent" />
                   ) : (
@@ -139,7 +142,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                         <Badge variant="accent">
                           {getPhaseType(phase.focus_area)}
                         </Badge>
-                        {isDone && <Badge variant="accent">Done ✓</Badge>}
+                        {isDone && <Badge variant="success">Done ✓</Badge>}
                       </div>
                       <p className="text-sm font-semibold text-primary mt-1">{phase.focus_area}</p>
                     </div>
@@ -180,8 +183,8 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                                   rel="noopener noreferrer"
                                   className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:border-accent hover:bg-background transition-colors group"
                                 >
-                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0 bg-accent-light">
-                                    <span className="text-xs font-bold text-accent">{r.type[0]}</span>
+                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
+                                    <span className="text-xs font-bold text-muted">{r.type[0]}</span>
                                   </div>
                                   <span className="text-xs text-secondary group-hover:text-primary transition-colors flex-1 min-w-0 truncate">{r.title}</span>
                                   <ExternalLink className="h-3 w-3 text-muted flex-shrink-0" />
@@ -203,7 +206,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                             <p className="text-xs text-secondary mb-2">{phase.project.description}</p>
                             <div className="flex flex-wrap gap-1">
                               {phase.project.tech.map((t) => (
-                                <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-accent-light text-accent">{t}</span>
+                                <span key={t} className="px-2 py-0.5 rounded text-xs border border-border text-secondary" style={{ background: 'var(--bg-secondary)' }}>{t}</span>
                               ))}
                             </div>
                           </div>
@@ -220,9 +223,10 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                             className={clsx(
                               'w-full py-2 rounded-lg text-sm font-medium transition-all border',
                               isDone
-                                ? 'bg-accent-light text-accent border-accent border-opacity-30'
+                                ? 'border-[var(--emerald)]'
                                 : 'bg-background text-secondary border-border hover:border-accent hover:text-accent'
                             )}
+                            style={isDone ? { background: 'var(--emerald-light)', color: 'var(--emerald-text)' } : undefined}
                           >
                             {isDone ? '✓ Phase complete' : 'Mark as complete'}
                           </button>

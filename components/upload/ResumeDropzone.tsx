@@ -93,8 +93,8 @@ export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: Resu
           </>
         ) : (
           <>
-            <div className="h-12 w-12 rounded-xl bg-accent-light flex items-center justify-center mb-3">
-              <Upload className="h-6 w-6 text-accent" />
+            <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-3" style={{ background: 'var(--bg-secondary)' }}>
+              <Upload className="h-6 w-6 text-muted" />
             </div>
             <p className="text-sm font-medium text-primary mb-1">
               Drop your resume here - PDF or DOCX

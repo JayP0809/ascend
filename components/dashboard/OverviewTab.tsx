@@ -20,8 +20,8 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
   return (
     <Card>
       <div className="flex items-start justify-between mb-3">
-        <div className="h-10 w-10 rounded-lg bg-accent-light flex items-center justify-center">
-          <Icon className="h-5 w-5 text-accent" />
+        <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-secondary)' }}>
+          <Icon className="h-5 w-5 text-muted" />
         </div>
       </div>
       <p className="text-xs text-muted mb-1">{label}</p>
@@ -115,7 +115,8 @@ export function OverviewTab({ data }: OverviewTabProps) {
               filteredSkills.map((skill) => (
                 <span
                   key={skill.name}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium bg-accent-light text-accent border border-accent border-opacity-20"
+                  className="px-2.5 py-1 rounded-md text-xs font-medium border border-border text-secondary"
+                  style={{ background: 'var(--bg-secondary)' }}
                 >
                   {skill.name}
                 </span>

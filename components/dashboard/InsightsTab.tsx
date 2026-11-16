@@ -61,7 +61,7 @@ export function InsightsTab({ data }: InsightsTabProps) {
           <MarketDemandBar data={marketDemandData} />
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5 text-xs text-secondary">
-              <div className="h-2.5 w-2.5 rounded-sm bg-accent" />You have it
+              <div className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--emerald)' }} />You have it
             </div>
             <div className="flex items-center gap-1.5 text-xs text-secondary">
               <div className="h-2.5 w-2.5 rounded-sm bg-border" />Gap to fill
@@ -91,8 +91,8 @@ export function InsightsTab({ data }: InsightsTabProps) {
               <p className="text-xs font-semibold text-muted mb-2">Your profile</p>
               <ul className="space-y-2">
                 {yourProfile.map((item, i) => (
-                  <li key={i} className={`text-xs flex items-start gap-1.5 ${matchingItems.has(item) ? 'text-accent' : 'text-secondary'}`}>
-                    <span className="flex-shrink-0">{matchingItems.has(item) ? '✓' : '○'}</span>{item}
+                  <li key={i} className="text-xs flex items-start gap-1.5" style={matchingItems.has(item) ? { color: 'var(--emerald-text)' } : undefined}>
+                    <span className="flex-shrink-0 text-secondary">{matchingItems.has(item) ? '✓' : '○'}</span>{item}
                   </li>
                 ))}
               </ul>
@@ -109,8 +109,8 @@ export function InsightsTab({ data }: InsightsTabProps) {
             const Icon = ICONS[i % ICONS.length];
             return (
               <Card key={i} className="flex items-start gap-3">
-                <div className="h-9 w-9 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0">
-                  <Icon className="h-4 w-4 text-accent" />
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
+                  <Icon className="h-4 w-4 text-muted" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-primary mb-1">

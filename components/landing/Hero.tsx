@@ -35,7 +35,7 @@ export function Hero({ onStartAnalysis }: HeroProps) {
           {TAG_CONFIG.map((tag, i) => (
             <div
               key={i}
-              className="absolute float-tag px-3 py-1 rounded-full border border-accent text-accent font-medium whitespace-nowrap text-xs"
+              className="absolute float-tag px-3 py-1 rounded-full border border-border text-muted font-medium whitespace-nowrap text-xs"
               style={{
                 left: tag.left,
                 bottom: '-50px',
@@ -54,17 +54,17 @@ export function Hero({ onStartAnalysis }: HeroProps) {
         <div className={mounted ? 'animate-fade-up' : ''}>
           <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-8"
-            style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
+            style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
           >
             <span
-              style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--text-muted)', display: 'inline-block' }}
             />
             Career navigation
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-primary mb-6 leading-tight">
             From where you are{' '}
-            <span className="gradient-text">→</span>{' '}
+            <span className="text-muted">→</span>{' '}
             where you want to be
           </h1>
 

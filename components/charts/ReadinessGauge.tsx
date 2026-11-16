@@ -32,7 +32,7 @@ export function ReadinessGauge({ score, targetRole }: ReadinessGaugeProps) {
 
   const data = [
     { value: animatedScore, fill: 'var(--accent)' },
-    { value: 100 - animatedScore, fill: theme === 'dark' ? '#2E2A26' : '#EDE9E5' },
+    { value: 100 - animatedScore, fill: theme === 'dark' ? '#35363A' : '#E0E0E4' },
   ];
 
   return (

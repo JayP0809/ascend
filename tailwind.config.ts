@@ -17,6 +17,7 @@ const config: Config = {
         background: 'var(--bg-secondary)',
         border: 'var(--border)',
         accent: 'var(--accent)',
+        'accent-fg': 'var(--accent-fg)',
         'accent-light': 'var(--accent-light)',
         danger: 'var(--danger)',
         'bg-primary': 'var(--bg-primary)',

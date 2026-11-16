@@ -111,15 +111,15 @@ function DashboardContent() {
 
       {/* Demo mode banner */}
       {isDemoMode && !demoBannerDismissed && (
-        <div className="bg-accent-light border-b border-border">
+        <div className="border-b border-border" style={{ background: 'var(--bg-secondary)' }}>
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-primary">
               <span className="font-semibold">Sample analysis</span> - You&apos;re exploring a fictional career roadmap.{' '}
-              <Link href="/?step=preview" className="text-accent hover:underline">
+              <Link href="/?step=preview" className="underline hover:text-primary">
                 View sample resume
               </Link>
               {' '}or{' '}
-              <Link href="/sign-in" className="text-accent hover:underline">
+              <Link href="/sign-in" className="underline hover:text-primary">
                 sign in
               </Link>
               {' '}to generate your own personalized roadmap.
@@ -139,7 +139,7 @@ function DashboardContent() {
           <div className="flex-1 min-w-0">
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-primary">
-                Your path to <span className="gradient-text">{targetRole}</span>
+                Your path to <span className="text-primary">{targetRole}</span>
               </h1>
               <p className="text-secondary mt-1 text-sm">
                 {data.analysis.skillExtraction.experience_years} years experience ·{' '}

@@ -191,7 +191,7 @@ export function ExportTab({ data }: ExportTabProps) {
         <div className="space-y-3">
           {PDF_SECTIONS.map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0">
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
                 <Icon className="h-4 w-4 text-accent" />
               </div>
               <span className="text-sm text-secondary">{label}</span>

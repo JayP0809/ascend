@@ -142,8 +142,8 @@ export function RoleSearch({ analysisId, onAnalysisStart: _onAnalysisStart, onAn
       </div>
 
       {selectedRole && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent border-opacity-30">
-          <span className="text-sm text-accent font-medium">{selectedRole.title}</span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border" style={{ background: 'var(--bg-secondary)' }}>
+          <span className="text-sm font-medium text-primary">{selectedRole.title}</span>
           <span className="text-xs text-muted">· {selectedRole.industry}</span>
           {selectedRole.avgSalary && (
             <span className="text-xs text-muted ml-auto">{selectedRole.avgSalary}</span>

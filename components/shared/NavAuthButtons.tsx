@@ -66,7 +66,7 @@ function AuthButtons() {
       </button>
       <button
         onClick={() => signIn('google', { callbackUrl: '/' })}
-        className="text-sm font-medium px-4 py-2 rounded-lg border border-accent text-accent hover:bg-accent hover:text-white transition-colors"
+        className="text-sm font-medium px-4 py-2 rounded-lg border border-border text-primary hover:border-accent hover:text-accent transition-colors"
       >
         Get started
       </button>

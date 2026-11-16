@@ -23,15 +23,15 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export function ProjectionLineChart({ data, startScore: _startScore }: ProjectionLineChartProps) {
   const { theme } = useTheme();
-  const [colors, setColors] = useState({ text: '#64748b', grid: '#334155', accent: '#6366f1' });
+  const [colors, setColors] = useState({ text: '#56575C', grid: '#35363A', accent: '#C6C7CC' });
 
   useEffect(() => {
     const root = document.documentElement;
     const style = getComputedStyle(root);
     setColors({
-      text: style.getPropertyValue('--text-muted').trim() || '#64748b',
-      grid: style.getPropertyValue('--border').trim() || '#334155',
-      accent: style.getPropertyValue('--accent').trim() || '#6366f1',
+      text: style.getPropertyValue('--text-muted').trim() || '#56565E',
+      grid: style.getPropertyValue('--border').trim() || '#2C2C31',
+      accent: style.getPropertyValue('--accent').trim() || '#E07A5F',
     });
   }, [theme]);
 

@@ -108,10 +108,10 @@ export function buildDistributionData(items: SkillGapItem[]): { name: string; va
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
   return [
-    { name: 'Technical', value: Math.round((counts.technical / total) * 100), color: '#E07A5F' },
-    { name: 'Soft Skills', value: Math.round((counts.soft / total) * 100), color: '#9B9490' },
-    { name: 'Tools', value: Math.round((counts.tools / total) * 100), color: '#C2622B' },
-    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#6B6560' },
+    { name: 'Technical', value: Math.round((counts.technical / total) * 100), color: '#C8C9CD' },
+    { name: 'Soft Skills', value: Math.round((counts.soft / total) * 100), color: '#7B7D84' },
+    { name: 'Tools', value: Math.round((counts.tools / total) * 100), color: '#5F7A68' },
+    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#B7A07A' },
   ].filter((d) => d.value > 0);
 }
 

@@ -18,7 +18,7 @@ export function Navbar({ breadcrumb, actions }: NavbarProps) {
             <Link href="/" className="flex items-center gap-2">
               <div
                 className="h-8 w-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'var(--accent)' }}
+                style={{ background: 'var(--gold)' }}
               >
                 <TrendingUp className="h-4 w-4" style={{ color: 'var(--bg-primary)' }} />
               </div>

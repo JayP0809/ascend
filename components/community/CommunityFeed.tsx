@@ -68,7 +68,7 @@ export function CommunityFeed() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
-          <Users className="h-5 w-5 text-accent" />
+          <Users className="h-5 w-5 text-muted" />
           Community Activity
         </h2>
         <div className="flex items-center gap-2 text-xs text-muted">
@@ -93,7 +93,7 @@ export function CommunityFeed() {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-secondary">
                     <span className="font-medium text-primary">Someone</span> is learning{' '}
-                    <span className="text-accent font-medium">{entry.top_gap}</span>
+                    <span className="font-medium text-primary">{entry.top_gap}</span>
                     {' · '}targeting <span className="font-medium text-primary">{entry.target_role}</span>
                   </p>
                 </div>
@@ -112,7 +112,7 @@ export function CommunityFeed() {
       {/* Trending skills */}
       <Card>
         <h3 className="text-sm font-semibold text-primary mb-4 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-accent" />
+          <TrendingUp className="h-4 w-4 text-muted" />
           Trending skills this week
         </h3>
         {trendingChartData.length > 0 && (

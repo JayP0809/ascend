@@ -17,7 +17,7 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
     <div className="rounded-lg border border-border bg-card p-3 shadow-lg text-xs">
       <p className="font-medium text-primary mb-1">{label}</p>
       <p className="text-secondary">Market demand: <span className="font-semibold text-primary">{payload[0].value}%</span></p>
-      <p style={{ color: hasSkill ? 'var(--accent)' : 'var(--text-muted)' }}>
+      <p style={{ color: hasSkill ? 'var(--emerald-text)' : 'var(--text-muted)' }}>
         {hasSkill ? '✓ You have this skill' : '○ Gap to fill'}
       </p>
     </div>
@@ -26,16 +26,16 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export function MarketDemandBar({ data }: MarketDemandBarProps) {
   const { theme } = useTheme();
-  const [colors, setColors] = useState({ text: '#9B9490', grid: '#2E2A26', accent: '#E07A5F', muted: '#4A3D35' });
+  const [colors, setColors] = useState({ text: '#56575C', grid: '#35363A', emerald: '#5F7A68', muted: '#35363A' });
 
   useEffect(() => {
     const root = document.documentElement;
     const style = getComputedStyle(root);
     setColors({
-      text: style.getPropertyValue('--text-muted').trim() || '#9B9490',
-      grid: style.getPropertyValue('--border').trim() || '#2E2A26',
-      accent: style.getPropertyValue('--accent').trim() || '#E07A5F',
-      muted: style.getPropertyValue('--border').trim() || '#4A3D35',
+      text: style.getPropertyValue('--text-muted').trim() || '#56575C',
+      grid: style.getPropertyValue('--border').trim() || '#35363A',
+      emerald: style.getPropertyValue('--emerald').trim() || '#5F7A68',
+      muted: style.getPropertyValue('--border').trim() || '#35363A',
     });
   }, [theme]);
 
@@ -62,7 +62,7 @@ export function MarketDemandBar({ data }: MarketDemandBarProps) {
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey="demand" radius={[0, 4, 4, 0]} animationDuration={800}>
           {data.map((entry, i) => (
-            <Cell key={i} fill={entry.hasSkill ? colors.accent : colors.muted} />
+            <Cell key={i} fill={entry.hasSkill ? colors.emerald : colors.muted} />
           ))}
         </Bar>
       </BarChart>

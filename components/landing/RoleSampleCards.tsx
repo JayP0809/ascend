@@ -103,7 +103,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
               viewport={{ once: true }}
             >
               <Card className="text-center py-8">
-                <div className="text-3xl font-bold gradient-text mb-1">{stat.value}</div>
+                <div className="text-3xl font-bold text-primary mb-1">{stat.value}</div>
                 <div className="text-sm text-secondary">{stat.label}</div>
               </Card>
             </motion.div>
