@@ -52,13 +52,13 @@ export interface QuotaStatus {
 export async function reserveQuotaSlot(
   userId: string | null,
   isDemoFlow = false,
-  clerkId?: string | null,
+  email?: string | null,
 ): Promise<QuotaStatus> {
   if (isDemoFlow || !userId) {
     return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
   }
 
-  const admin = isAdminUser(clerkId);
+  const admin = isAdminUser(email);
 
   const db = getDbClient();
   if (!db) {
@@ -134,7 +134,7 @@ export async function reserveQuotaSlot(
  */
 export async function refundQuotaSlot(
   userId: string | null,
-  _clerkId?: string | null,
+  _email?: string | null,
 ): Promise<void> {
   if (!userId) return;
 
@@ -156,13 +156,13 @@ export async function refundQuotaSlot(
 export async function getQuotaStatus(
   userId: string | null,
   isDemoFlow = false,
-  clerkId?: string | null,
+  email?: string | null,
 ): Promise<QuotaStatus> {
   if (isDemoFlow || !userId) {
     return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth() };
   }
 
-  const admin = isAdminUser(clerkId);
+  const admin = isAdminUser(email);
 
   const db = getDbClient();
   if (!db) {

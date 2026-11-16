@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { saveAnalysis, getAnalysis, saveCommunityEntry } from '@/lib/db';
 import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
 import { buildDashboardData } from '@/lib/scorer';
-import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, CLERK_CONFIGURED } from '@/lib/auth';
+import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, AUTH_CONFIGURED } from '@/lib/auth';
 import { reserveQuotaSlot, refundQuotaSlot } from '@/lib/quota';
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const user = await getCurrentUser(request);
 
   if (!DEV_BYPASS_ACTIVE && !user) {
-    if (!CLERK_CONFIGURED && process.env.NODE_ENV === 'production') {
+    if (!AUTH_CONFIGURED && process.env.NODE_ENV === 'production') {
       return NextResponse.json(
         { error: 'Authentication service is not configured. Contact the site administrator.' },
         { status: 503 }
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Groq subsequently fails — the user gets no value, so they should not pay
   // quota.  The slot is NOT refunded when Groq succeeds but a DB write fails
   // afterward, since the AI tokens were consumed regardless.
-  const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.clerkId);
+  const quota = await reserveQuotaSlot(user?.userId ?? null, false, user?.email);
   if (!quota.allowed) {
     return NextResponse.json(
       { error: quota.message ?? 'Monthly analysis quota exceeded.' },

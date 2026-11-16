@@ -5,7 +5,7 @@
  *   1. checkAnalysisAccess() — all branches of the ownership model
  *   2. Demo ID routing — always public, never touches DB
  *   3. Quota enforcement — pure logic (no DB), atomic reservation model
- *   4. Auth module flags — CLERK_CONFIGURED and DEV_BYPASS_ACTIVE semantics
+ *   4. Auth module flags — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE semantics
  *
  * Tests that require a live database or Clerk session are tagged [integration]
  * or [live-auth] and are either skipped or documented as manual steps below.
@@ -19,15 +19,15 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { checkAnalysisAccess } from './auth';
 import type { AuthUser } from './auth';
 
-const HAS_DB    = !!process.env.DATABASE_URL;
-const HAS_CLERK = !!(process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+const HAS_DB   = !!process.env.DATABASE_URL;
+const HAS_AUTH = !!(process.env.AUTH_SECRET && process.env.AUTH_GOOGLE_ID);
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function user(id: string): AuthUser {
-  return { userId: id, clerkId: `clerk_${id}`, email: `${id}@test.com` };
+  return { userId: id, providerId: `google_sub_${id}`, email: `${id}@test.com` };
 }
 
 function record(userId: string | null) {
@@ -38,31 +38,31 @@ function record(userId: string | null) {
 // 1. checkAnalysisAccess — authorization logic
 // ---------------------------------------------------------------------------
 
-describe('checkAnalysisAccess — dev bypass (Clerk absent, non-production)', () => {
-  // These tests only make sense when CLERK is not configured.
-  // If the CI environment has Clerk keys the results will differ.
-  it.skipIf(HAS_CLERK)('allows any user to access any record in dev mode', () => {
+describe('checkAnalysisAccess — dev bypass (Auth.js absent, non-production)', () => {
+  // These tests only make sense when Auth.js is not configured.
+  // If the CI environment has AUTH_SECRET + AUTH_GOOGLE_ID the results will differ.
+  it.skipIf(HAS_AUTH)('allows any user to access any record in dev mode', () => {
     // SIMULATED — tests the pure function, not an HTTP call
     const result = checkAnalysisAccess(record('owner-id'), user('other-id'));
     // DEV_BYPASS_ACTIVE = true when CLERK absent + non-production
     expect(result.granted).toBe(true);
   });
 
-  it.skipIf(HAS_CLERK)('allows null user to access a record in dev mode', () => {
+  it.skipIf(HAS_AUTH)('allows null user to access a record in dev mode', () => {
     const result = checkAnalysisAccess(record('owner-id'), null);
     expect(result.granted).toBe(true);
   });
 
-  it.skipIf(HAS_CLERK)('allows access to ownerless records in dev mode', () => {
+  it.skipIf(HAS_AUTH)('allows access to ownerless records in dev mode', () => {
     const result = checkAnalysisAccess(record(null), null);
     expect(result.granted).toBe(true);
   });
 });
 
-describe('checkAnalysisAccess — Clerk configured (production auth rules)', () => {
+describe('checkAnalysisAccess — Auth.js configured (production auth rules)', () => {
   // These tests simulate the production path by calling the function with
-  // arguments that mirror what would happen when CLERK_CONFIGURED = true.
-  // Since we cannot flip CLERK_CONFIGURED in a unit test without mocking the
+  // arguments that mirror what would happen when AUTH_CONFIGURED = true.
+  // Since we cannot flip AUTH_CONFIGURED in a unit test without mocking the
   // module, we document the expected outcomes and test them via the
   // DEV_BYPASS_ACTIVE condition path where possible.
 
@@ -81,7 +81,7 @@ describe('checkAnalysisAccess — Clerk configured (production auth rules)', () 
 
   it('cross-user rule: returns 404 to avoid leaking existence', () => {
     // This path is only tested when CLERK is configured.
-    if (!HAS_CLERK) {
+    if (!HAS_AUTH) {
       // In dev mode checkAnalysisAccess returns true for all — documented.
       return;
     }
@@ -92,9 +92,9 @@ describe('checkAnalysisAccess — Clerk configured (production auth rules)', () 
     expect((result as { granted: false; status: number }).status).toBe(404);
   });
 
-  it('ownerless-record rule: returns 404 (not public) when CLERK configured', () => {
+  it('ownerless-record rule: returns 404 (not public) when Auth.js configured', () => {
     // Ownerless records are PRIVATE. This is the fix for the null=public bug.
-    if (!HAS_CLERK) return;
+    if (!HAS_AUTH) return;
     const r = record(null);
     const u = user('alice');
     const result = checkAnalysisAccess(r, u);
@@ -102,8 +102,8 @@ describe('checkAnalysisAccess — Clerk configured (production auth rules)', () 
     expect((result as { granted: false; status: number }).status).toBe(404);
   });
 
-  it('unauthenticated rule: returns 401 when CLERK configured and no user', () => {
-    if (!HAS_CLERK) return;
+  it('unauthenticated rule: returns 401 when Auth.js configured and no user', () => {
+    if (!HAS_AUTH) return;
     const r = record('alice');
     const result = checkAnalysisAccess(r, null);
     expect(result.granted).toBe(false);
@@ -119,7 +119,7 @@ describe('checkAnalysisAccess — Clerk configured (production auth rules)', () 
 // returns for each combination of inputs. This is the "source of truth" to
 // compare against manual or integration tests when Clerk is live.
 //
-// | CLERK_CONFIGURED | NODE_ENV     | user    | record.user_id | Expected    |
+// | AUTH_CONFIGURED  | NODE_ENV     | user    | record.user_id | Expected    |
 // |------------------|--------------|---------|----------------|-------------|
 // | false            | development  | null    | null           | granted     |
 // | false            | development  | null    | 'alice'        | granted     |  ← dev bypass
@@ -217,57 +217,54 @@ describe('quota — bypass and pure-logic checks', () => {
 // ---------------------------------------------------------------------------
 
 describe('admin quota exemption — isAdminUser()', () => {
-  it('returns false when ADMIN_CLERK_USER_ID is not set', async () => {
+  it('returns false when ADMIN_EMAIL is not set', async () => {
     const { isAdminUser } = await import('./auth');
-    // In CI and local dev, ADMIN_CLERK_USER_ID is not set → no admin
-    if (!process.env.ADMIN_CLERK_USER_ID) {
-      expect(isAdminUser('user_any_clerk_id')).toBe(false);
+    // In CI and local dev, ADMIN_EMAIL is not set → no admin
+    if (!process.env.ADMIN_EMAIL) {
+      expect(isAdminUser('someone@example.com')).toBe(false);
       expect(isAdminUser(null)).toBe(false);
       expect(isAdminUser(undefined)).toBe(false);
     }
   });
 
-  it('returns false for null or undefined clerkId regardless of env var', async () => {
+  it('returns false for null or undefined email regardless of env var', async () => {
     const { isAdminUser } = await import('./auth');
     expect(isAdminUser(null)).toBe(false);
     expect(isAdminUser(undefined)).toBe(false);
     expect(isAdminUser('')).toBe(false);
   });
 
-  it('never grants admin status based on a fake/guessed clerkId', async () => {
+  it('never grants admin status based on a fake/guessed email', async () => {
     const { isAdminUser } = await import('./auth');
-    // Even if someone sends a request with a clerkId that looks admin-like,
-    // it only matches if it exactly equals ADMIN_CLERK_USER_ID from the env.
-    // These are plausible-looking Clerk IDs that must NOT grant admin access.
-    const fakeIds = [
-      'user_admin',
-      'user_ADMIN',
+    // Even if someone sends a request with an email that looks admin-like,
+    // it only matches if it exactly equals ADMIN_EMAIL from the env.
+    const fakeEmails = [
       'admin',
-      'user_2NNNNNNNNNNNNNNNNNNNNNNfake',
+      'admin@',
+      'ADMIN@example.com',
+      'notadmin@example.com',
       '',
     ];
-    for (const id of fakeIds) {
-      expect(isAdminUser(id)).toBe(false);
+    for (const email of fakeEmails) {
+      expect(isAdminUser(email)).toBe(false);
     }
   });
 
-  it('returns true only when clerkId exactly matches ADMIN_CLERK_USER_ID', async () => {
-    // We test the exact-match logic using process.env manipulation.
-    // This does NOT test with a real Clerk user — it tests the matching logic.
-    const original = process.env.ADMIN_CLERK_USER_ID;
+  it('returns true only when email exactly matches ADMIN_EMAIL (case-insensitive)', async () => {
+    const original = process.env.ADMIN_EMAIL;
     try {
-      process.env.ADMIN_CLERK_USER_ID = 'user_2TestAdminExactMatch123';
-      // Must re-import to pick up env change — use direct function call approach
+      process.env.ADMIN_EMAIL = 'admin@ascend.test';
       const { isAdminUser } = await import('./auth');
       // Note: isAdminUser reads process.env at call time (not module load time)
-      expect(isAdminUser('user_2TestAdminExactMatch123')).toBe(true);
-      expect(isAdminUser('user_2TestAdminExactMatch124')).toBe(false); // 1 char diff
-      expect(isAdminUser('user_2TestAdminExactMatch')).toBe(false);    // truncated
+      expect(isAdminUser('admin@ascend.test')).toBe(true);
+      expect(isAdminUser('ADMIN@ASCEND.TEST')).toBe(true);   // case-insensitive
+      expect(isAdminUser('admin@ascend.test2')).toBe(false); // different domain
+      expect(isAdminUser('notadmin@ascend.test')).toBe(false);
     } finally {
       if (original === undefined) {
-        delete process.env.ADMIN_CLERK_USER_ID;
+        delete process.env.ADMIN_EMAIL;
       } else {
-        process.env.ADMIN_CLERK_USER_ID = original;
+        process.env.ADMIN_EMAIL = original;
       }
     }
   });
@@ -277,34 +274,34 @@ describe('admin quota exemption — isAdminUser()', () => {
     // The ownership check is in checkAnalysisAccess() and is always enforced.
     const { checkAnalysisAccess, isAdminUser } = await import('./auth');
 
-    const adminClerkId = 'user_2AdminTestXYZ';
-    const original = process.env.ADMIN_CLERK_USER_ID;
+    const adminEmail = 'admin@ascend.test';
+    const original = process.env.ADMIN_EMAIL;
     try {
-      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
-      expect(isAdminUser(adminClerkId)).toBe(true);
+      process.env.ADMIN_EMAIL = adminEmail;
+      expect(isAdminUser(adminEmail)).toBe(true);
 
-      if (!HAS_CLERK) {
+      if (!HAS_AUTH) {
         // In dev mode, checkAnalysisAccess grants access to all — bypass active.
-        // This test documents that in PRODUCTION (HAS_CLERK=true) the admin
+        // This test documents that in PRODUCTION (HAS_AUTH=true) the admin
         // cannot access a record they don't own, even with admin status.
         // Manual verification required: see [live-auth] section below.
         return;
       }
 
-      // With Clerk configured: admin trying to read a record owned by another
+      // With Auth.js configured: admin trying to read a record owned by another
       // user should still get 404.
       const otherUserId = 'bbbbbbbb-0000-0000-0000-000000000002';
       const adminDbUserId = 'aaaaaaaa-0000-0000-0000-000000000001';
-      const adminUser = { userId: adminDbUserId, clerkId: adminClerkId, email: 'admin@test.com' };
+      const adminUser = { userId: adminDbUserId, providerId: 'google_sub_admin', email: adminEmail };
       const record = { user_id: otherUserId };
       const result = checkAnalysisAccess(record, adminUser);
       expect(result.granted).toBe(false);
       expect((result as { granted: false; status: number }).status).toBe(404);
     } finally {
       if (original === undefined) {
-        delete process.env.ADMIN_CLERK_USER_ID;
+        delete process.env.ADMIN_EMAIL;
       } else {
-        process.env.ADMIN_CLERK_USER_ID = original;
+        process.env.ADMIN_EMAIL = original;
       }
     }
   });
@@ -313,22 +310,22 @@ describe('admin quota exemption — isAdminUser()', () => {
     // This test checks the no-DB fallback path. When DATABASE_URL is set, skip:
     // the DB path is covered by the [integration] tests below.
     if (HAS_DB) return;
-    const original = process.env.ADMIN_CLERK_USER_ID;
+    const original = process.env.ADMIN_EMAIL;
     try {
-      process.env.ADMIN_CLERK_USER_ID = 'user_2AdminNoDBTest';
+      process.env.ADMIN_EMAIL = 'admin@ascend.test';
       const { reserveQuotaSlot } = await import('./quota');
       const result = await reserveQuotaSlot(
         'aaaaaaaa-0000-0000-0000-000000000001',
         false,
-        'user_2AdminNoDBTest',
+        'admin@ascend.test',
       );
       expect(result.allowed).toBe(true);
       expect(result.adminExempt).toBe(true);
     } finally {
       if (original === undefined) {
-        delete process.env.ADMIN_CLERK_USER_ID;
+        delete process.env.ADMIN_EMAIL;
       } else {
-        process.env.ADMIN_CLERK_USER_ID = original;
+        process.env.ADMIN_EMAIL = original;
       }
     }
   });
@@ -341,7 +338,7 @@ describe('admin quota exemption — isAdminUser()', () => {
     const result = await reserveQuotaSlot(
       'aaaaaaaa-0000-0000-0000-000000000001',
       false,
-      'user_2RegularUser',
+      'regular@example.com',
     );
     expect(result.adminExempt).toBeFalsy();
   });
@@ -351,33 +348,33 @@ describe('admin quota exemption — isAdminUser()', () => {
 // 5. Auth module flags
 // ---------------------------------------------------------------------------
 
-describe('auth — CLERK_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
-  it('CLERK_CONFIGURED is false when env vars are absent', async () => {
-    const { CLERK_CONFIGURED } = await import('./auth');
-    if (!HAS_CLERK) {
-      expect(CLERK_CONFIGURED).toBe(false);
+describe('auth — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
+  it('AUTH_CONFIGURED is false when env vars are absent', async () => {
+    const { AUTH_CONFIGURED } = await import('./auth');
+    if (!HAS_AUTH) {
+      expect(AUTH_CONFIGURED).toBe(false);
     }
   });
 
-  it('DEV_BYPASS_ACTIVE is true in test environment without Clerk', async () => {
+  it('DEV_BYPASS_ACTIVE is true in test environment without Auth.js', async () => {
     const { DEV_BYPASS_ACTIVE } = await import('./auth');
     // Vitest runs in NODE_ENV=test which is !== 'production', so with no
-    // Clerk keys, DEV_BYPASS_ACTIVE should be true.
-    if (!HAS_CLERK) {
+    // Auth.js credentials, DEV_BYPASS_ACTIVE should be true.
+    if (!HAS_AUTH) {
       expect(DEV_BYPASS_ACTIVE).toBe(true);
     }
   });
 
-  it('requiresAuth returns false for demo IDs regardless of Clerk state', async () => {
+  it('requiresAuth returns false for demo IDs regardless of Auth.js state', async () => {
     const { requiresAuth } = await import('./auth');
     expect(requiresAuth('demo-sample-001')).toBe(false);
     expect(requiresAuth('demo-')).toBe(false);
     expect(requiresAuth(undefined)).toBe(false);
   });
 
-  it('requiresAuth returns false for real IDs when Clerk is not configured', async () => {
-    const { requiresAuth, CLERK_CONFIGURED } = await import('./auth');
-    if (!CLERK_CONFIGURED) {
+  it('requiresAuth returns false for real IDs when Auth.js is not configured', async () => {
+    const { requiresAuth, AUTH_CONFIGURED } = await import('./auth');
+    if (!AUTH_CONFIGURED) {
       expect(requiresAuth('aaaaaaaa-0000-0000-0000-000000000001')).toBe(false);
     }
   });
@@ -393,8 +390,8 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
   // fully isolated and can run in any order.
   //
   // We seed test users directly via the Neon HTTP client so there is no
-  // dependency on the Clerk sign-in flow.
-  let seedUser: (clerkId: string) => Promise<string>;
+  // dependency on the OAuth sign-in flow.
+  let seedUser: (providerId: string) => Promise<string>;
 
   beforeAll(async () => {
     const { neon } = await import('@neondatabase/serverless');
@@ -404,11 +401,11 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
     u.searchParams.delete('channel_binding');
     const sql = neon(u.toString());
 
-    seedUser = async (clerkId: string): Promise<string> => {
+    seedUser = async (providerId: string): Promise<string> => {
       const userId = crypto.randomUUID();
       await sql`
         INSERT INTO users (id, clerk_id, email)
-        VALUES (${userId}, ${clerkId}, ${clerkId + '@test.local'})
+        VALUES (${userId}, ${providerId}, ${providerId + '@test.local'})
         ON CONFLICT (clerk_id) DO NOTHING
       `;
       return userId;
@@ -423,7 +420,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
     // conflict, resulting in both being denied. This test would have failed
     // against the old implementation.
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = await seedUser(`clerk_concurrent_${Date.now()}`);
+    const userId = await seedUser(`provider_concurrent_${Date.now()}`);
     const concurrency = Math.min(MONTHLY_ANALYSIS_QUOTA, 5);
 
     const results = await Promise.all(
@@ -436,7 +433,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('request beyond quota limit is denied', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = await seedUser(`clerk_exhaust_${Date.now()}`);
+    const userId = await seedUser(`provider_exhaust_${Date.now()}`);
 
     for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
       await reserveQuotaSlot(userId, false);
@@ -450,7 +447,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('demo bypass works even after quota is exhausted', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = await seedUser(`clerk_demobp_${Date.now()}`);
+    const userId = await seedUser(`provider_demobp_${Date.now()}`);
 
     for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
       await reserveQuotaSlot(userId, false);
@@ -463,7 +460,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('getQuotaStatus reflects current usage without reserving a slot', async () => {
     const { reserveQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_status_${Date.now()}`);
+    const userId = await seedUser(`provider_status_${Date.now()}`);
 
     await reserveQuotaSlot(userId, false);
     const status = await getQuotaStatus(userId);
@@ -472,47 +469,46 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   it('[admin] can exceed regular quota limit — usage tracked', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const adminClerkId = `user_2AdminIntegration${Date.now()}`;
-    const userId = await seedUser(adminClerkId);
-    const original = process.env.ADMIN_CLERK_USER_ID;
+    const adminEmail = `admin_integration_${Date.now()}@ascend.test`;
+    const userId = await seedUser(`provider_admin_integration_${Date.now()}`);
+    const original = process.env.ADMIN_EMAIL;
     try {
-      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
+      process.env.ADMIN_EMAIL = adminEmail;
       const extraRequests = MONTHLY_ANALYSIS_QUOTA + 3;
       for (let i = 0; i < extraRequests; i++) {
-        const r = await reserveQuotaSlot(userId, false, adminClerkId);
+        const r = await reserveQuotaSlot(userId, false, adminEmail);
         expect(r.allowed).toBe(true);
         expect(r.adminExempt).toBe(true);
       }
       const { getQuotaStatus } = await import('./quota');
-      const status = await getQuotaStatus(userId, false, adminClerkId);
+      const status = await getQuotaStatus(userId, false, adminEmail);
       expect(status.used).toBe(extraRequests);
       expect(status.adminExempt).toBe(true);
       expect(status.allowed).toBe(true);
     } finally {
-      if (original === undefined) delete process.env.ADMIN_CLERK_USER_ID;
-      else process.env.ADMIN_CLERK_USER_ID = original;
+      if (original === undefined) delete process.env.ADMIN_EMAIL;
+      else process.env.ADMIN_EMAIL = original;
     }
   });
 
   it('[admin] non-admin user is still denied after quota exhausted', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const adminClerkId = `user_2AdminIsolation${Date.now()}`;
-    const regularClerkId = `user_2RegularNotAdmin${Date.now()}`;
-    const regularUserId = await seedUser(regularClerkId);
-    const original = process.env.ADMIN_CLERK_USER_ID;
+    const regularEmail = `regular_notadmin_${Date.now()}@example.com`;
+    const regularUserId = await seedUser(`provider_regular_${Date.now()}`);
+    const original = process.env.ADMIN_EMAIL;
     try {
-      process.env.ADMIN_CLERK_USER_ID = adminClerkId;
+      process.env.ADMIN_EMAIL = `different_admin_${Date.now()}@ascend.test`;
 
       for (let i = 0; i < MONTHLY_ANALYSIS_QUOTA; i++) {
-        await reserveQuotaSlot(regularUserId, false, regularClerkId);
+        await reserveQuotaSlot(regularUserId, false, regularEmail);
       }
 
-      const over = await reserveQuotaSlot(regularUserId, false, regularClerkId);
+      const over = await reserveQuotaSlot(regularUserId, false, regularEmail);
       expect(over.allowed).toBe(false);
       expect(over.adminExempt).toBeFalsy();
     } finally {
-      if (original === undefined) delete process.env.ADMIN_CLERK_USER_ID;
-      else process.env.ADMIN_CLERK_USER_ID = original;
+      if (original === undefined) delete process.env.ADMIN_EMAIL;
+      else process.env.ADMIN_EMAIL = original;
     }
   });
 });
@@ -546,7 +542,7 @@ describe('quota refund — pure logic (no DB)', () => {
 });
 
 describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cycle', () => {
-  let seedUser: (clerkId: string) => Promise<string>;
+  let seedUser: (providerId: string) => Promise<string>;
 
   beforeAll(async () => {
     const { neon } = await import('@neondatabase/serverless');
@@ -556,11 +552,11 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
     u.searchParams.delete('channel_binding');
     const sql = neon(u.toString());
 
-    seedUser = async (clerkId: string): Promise<string> => {
+    seedUser = async (providerId: string): Promise<string> => {
       const userId = crypto.randomUUID();
       await sql`
         INSERT INTO users (id, clerk_id, email)
-        VALUES (${userId}, ${clerkId}, ${clerkId + '@test.local'})
+        VALUES (${userId}, ${providerId}, ${providerId + '@test.local'})
         ON CONFLICT (clerk_id) DO NOTHING
       `;
       return userId;
@@ -569,7 +565,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('reserve then refund leaves count at 0 (net zero)', async () => {
     const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_refund_netzero_${Date.now()}`);
+    const userId = await seedUser(`provider_refund_netzero_${Date.now()}`);
 
     const reserved = await reserveQuotaSlot(userId, false);
     expect(reserved.allowed).toBe(true);
@@ -583,7 +579,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('reserve twice, refund once leaves count at 1', async () => {
     const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_refund_partial_${Date.now()}`);
+    const userId = await seedUser(`provider_refund_partial_${Date.now()}`);
 
     await reserveQuotaSlot(userId, false);
     await reserveQuotaSlot(userId, false);
@@ -595,7 +591,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('refunding below zero is clamped to 0 (GREATEST guard)', async () => {
     const { refundQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_refund_clamp_${Date.now()}`);
+    const userId = await seedUser(`provider_refund_clamp_${Date.now()}`);
 
     // No reserve — count starts at 0 (no row). Refund on a non-existent row
     // must not error and usage must remain 0.
@@ -606,7 +602,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('failed analysis (refund) does not consume a permanent slot', async () => {
     const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
-    const userId = await seedUser(`clerk_refund_failed_${Date.now()}`);
+    const userId = await seedUser(`provider_refund_failed_${Date.now()}`);
 
     // Simulate: reserve slot → Groq fails → refund slot. Repeat up to quota.
     // After all refunds, quota should still be fully available.
@@ -623,7 +619,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('successful analysis (no refund) correctly consumes a slot', async () => {
     const { reserveQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_norebound_success_${Date.now()}`);
+    const userId = await seedUser(`provider_norebound_success_${Date.now()}`);
 
     // Simulate: reserve slot → Groq succeeds → NO refund.
     const r = await reserveQuotaSlot(userId, false);
@@ -636,7 +632,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   it('concurrent refunds do not produce negative counts', async () => {
     const { reserveQuotaSlot, refundQuotaSlot, getQuotaStatus } = await import('./quota');
-    const userId = await seedUser(`clerk_refund_concurrent_${Date.now()}`);
+    const userId = await seedUser(`provider_refund_concurrent_${Date.now()}`);
 
     // Reserve 3 slots concurrently, then refund all 3 concurrently.
     await Promise.all([
@@ -658,8 +654,8 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 });
 
 /*
- * [live-auth] Tests that cannot run without a Clerk configuration.
- * Manual verification steps for post-Clerk-setup testing:
+ * [live-auth] Tests that cannot run without Auth.js + Google OAuth configuration.
+ * Manual verification steps for post-deployment testing:
  *
  * 1. Cross-user read (IDOR):
  *    Sign in as user A. Upload + analyze → copy analysisId.
@@ -676,11 +672,11 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
  *
  * 4. Client-supplied userId ignored:
  *    POST /api/analyze with body { userId: 'other-user-id', analysisId: ... }
- *    Server must derive identity from Clerk session only.
+ *    Server must derive identity from Auth.js JWT session only.
  *    Verify the saved analysis is bound to the session user, not 'other-user-id'.
  *
  * 5. Production misconfiguration (503):
- *    Deploy with CLERK_SECRET_KEY absent, NODE_ENV=production.
+ *    Deploy with AUTH_SECRET absent, NODE_ENV=production.
  *    GET /api/analyze?id=<real-uuid> → expect 503.
  *    GET /api/analyze?id=demo-sample → expect 200 (demo still works).
  */

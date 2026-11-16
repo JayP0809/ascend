@@ -1,69 +1,62 @@
 'use client';
-import Link from 'next/link';
-import { useAuth, UserButton } from '@clerk/nextjs';
-
-const CLERK_CONFIGURED = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 /**
- * Clerk-aware auth buttons for the navigation bar.
+ * Auth.js-aware auth buttons for the navigation bar.
  *
- * Signed out → "Sign in" link + "Get started" outline button
- * Signed in  → Clerk UserButton (avatar + dropdown with Sign out)
- * No Clerk   → renders nothing (local dev without keys)
+ * Not configured (AUTH_GOOGLE_ID absent)  → renders nothing (local dev)
+ * Loading                                 → skeleton placeholder
+ * Signed out                              → "Sign in with Google" button
+ * Signed in                               → user email + "Sign out" link
  *
- * Uses useAuth() because SignedIn/SignedOut are Server Components in
- * Clerk v7 and cannot be used inside 'use client' components.
+ * NEXT_PUBLIC_AUTH_ENABLED must be set to 'true' to enable the auth UI.
+ * This avoids rendering sign-in buttons when Google credentials are not
+ * configured (which would lead to a broken OAuth flow).
  */
+const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true';
+
 export function NavAuthButtons() {
-  if (!CLERK_CONFIGURED) return null;
-  return <ClerkAuthButtons />;
+  if (!AUTH_ENABLED) return null;
+  return <AuthButtons />;
 }
 
-function ClerkAuthButtons() {
-  const { isSignedIn, isLoaded } = useAuth();
+function AuthButtons() {
+  const { data: session, status } = useSession();
 
-  // Show nothing while Clerk initialises to avoid a flash of wrong state.
-  if (!isLoaded) {
-    return <div className="h-9 w-16 rounded-lg bg-background border border-border" />;
+  if (status === 'loading') {
+    return <div className="h-9 w-24 rounded-lg bg-background border border-border animate-pulse" />;
   }
 
-  if (isSignedIn) {
+  if (session) {
     return (
-      <UserButton
-        appearance={{
-          elements: {
-            avatarBox: 'h-9 w-9 rounded-lg',
-            userButtonPopoverCard:
-              'bg-card border border-border shadow-lg rounded-xl',
-            userButtonPopoverActionButton:
-              'text-sm text-primary hover:bg-card-hover rounded-lg',
-            userButtonPopoverActionButtonText: 'text-primary',
-            userButtonPopoverFooter: 'hidden',
-          },
-          variables: {
-            colorPrimary: '#E07A5F',
-            borderRadius: '0.5rem',
-            fontFamily: 'Inter, sans-serif',
-          },
-        }}
-      />
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-secondary hidden sm:block truncate max-w-[180px]">
+          {session.user.email}
+        </span>
+        <button
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className="text-sm font-medium px-4 py-2 rounded-lg border border-border text-secondary hover:text-primary hover:border-accent transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
     );
   }
 
   return (
     <div className="flex items-center gap-2">
-      <Link
-        href="/sign-in"
+      <button
+        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
         className="text-sm font-medium text-secondary hover:text-primary transition-colors px-3 py-2 rounded-lg"
       >
         Sign in
-      </Link>
-      <Link
-        href="/sign-up"
+      </button>
+      <button
+        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
         className="text-sm font-medium px-4 py-2 rounded-lg border border-accent text-accent hover:bg-accent hover:text-white transition-colors"
       >
         Get started
-      </Link>
+      </button>
     </div>
   );
 }
