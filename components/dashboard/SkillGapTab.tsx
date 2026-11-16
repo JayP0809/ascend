@@ -16,8 +16,8 @@ const FILTERS: Filter[] = ['All', 'Critical', 'Nice to Have', 'Transferable', 'Y
 
 function importanceBadge(importance: SkillGapItem['importance']) {
   const map = {
-    critical: { variant: 'danger', label: 'Critical' },
-    'nice-to-have': { variant: 'warning', label: 'Nice to have' },
+    critical: { variant: 'default', label: 'Critical' },
+    'nice-to-have': { variant: 'default', label: 'Nice to have' },
     transferable: { variant: 'accent', label: 'Transferable' },
     has: { variant: 'accent', label: 'You have it' },
   } as const;
@@ -27,7 +27,7 @@ function importanceBadge(importance: SkillGapItem['importance']) {
 
 function DemandIcon({ trend }: { trend: SkillGapItem['demandTrend'] }) {
   if (trend === 'up') return <TrendingUp className="h-3 w-3 text-accent" />;
-  if (trend === 'down') return <TrendingDown className="h-3 w-3 text-[var(--danger)]" />;
+  if (trend === 'down') return <TrendingDown className="h-3 w-3 text-muted" />;
   return <Minus className="h-3 w-3 text-muted" />;
 }
 

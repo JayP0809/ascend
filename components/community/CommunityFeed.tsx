@@ -98,7 +98,7 @@ export function CommunityFeed() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                  <Badge variant={entry.readiness_score >= 75 ? 'success' : entry.readiness_score >= 50 ? 'warning' : 'outline'}>
+                  <Badge variant="outline">
                     {Math.round(entry.readiness_score)}%
                   </Badge>
                   <span className="text-xs text-muted">{timeAgo(entry.created_at)}</span>

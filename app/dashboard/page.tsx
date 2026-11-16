@@ -68,7 +68,7 @@ function DashboardContent() {
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="max-w-md mx-auto text-center pt-20">
-            <div className="h-16 w-16 rounded-full bg-danger bg-opacity-15 flex items-center justify-center mx-auto mb-4">
+            <div className="h-16 w-16 rounded-full bg-[var(--danger)] bg-opacity-15 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="h-8 w-8 text-[var(--danger)]" />
             </div>
             <h2 className="text-xl font-semibold text-primary mb-2">Analysis not found</h2>
@@ -111,7 +111,7 @@ function DashboardContent() {
 
       {/* Demo mode banner */}
       {isDemoMode && !demoBannerDismissed && (
-        <div className="bg-[var(--warning)] bg-opacity-15 border-b border-[var(--warning)] border-opacity-20">
+        <div className="bg-accent-light border-b border-border">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-primary">
               <span className="font-semibold">Sample analysis</span> - You&apos;re exploring a fictional career roadmap.{' '}

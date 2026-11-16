@@ -234,7 +234,7 @@ export function ExportTab({ data }: ExportTabProps) {
           className="w-full"
           onClick={handleCopyLink}
         >
-          {copied ? <CheckCircle className="h-4 w-4 text-[var(--success)]" /> : <Link2 className="h-4 w-4" />}
+          {copied ? <CheckCircle className="h-4 w-4 text-accent" /> : <Link2 className="h-4 w-4" />}
           {copied ? 'Link copied!' : 'Copy shareable link'}
         </Button>
       </div>

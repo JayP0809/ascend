@@ -61,10 +61,10 @@ export function InsightsTab({ data }: InsightsTabProps) {
           <MarketDemandBar data={marketDemandData} />
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5 text-xs text-secondary">
-              <div className="h-2.5 w-2.5 rounded-sm bg-[var(--success)]" />You have it
+              <div className="h-2.5 w-2.5 rounded-sm bg-accent" />You have it
             </div>
             <div className="flex items-center gap-1.5 text-xs text-secondary">
-              <div className="h-2.5 w-2.5 rounded-sm bg-[var(--warning)]" />Gap to fill
+              <div className="h-2.5 w-2.5 rounded-sm bg-border" />Gap to fill
             </div>
           </div>
         </Card>
@@ -82,7 +82,7 @@ export function InsightsTab({ data }: InsightsTabProps) {
               <ul className="space-y-2">
                 {typicalCandidateProfile.map((item, i) => (
                   <li key={i} className="text-xs text-secondary flex items-start gap-1.5">
-                    <span className="text-[var(--success)] flex-shrink-0">•</span>{item}
+                    <span className="text-muted flex-shrink-0">•</span>{item}
                   </li>
                 ))}
               </ul>
@@ -91,7 +91,7 @@ export function InsightsTab({ data }: InsightsTabProps) {
               <p className="text-xs font-semibold text-muted mb-2">Your profile</p>
               <ul className="space-y-2">
                 {yourProfile.map((item, i) => (
-                  <li key={i} className={`text-xs flex items-start gap-1.5 ${matchingItems.has(item) ? 'text-[var(--success)]' : 'text-secondary'}`}>
+                  <li key={i} className={`text-xs flex items-start gap-1.5 ${matchingItems.has(item) ? 'text-accent' : 'text-secondary'}`}>
                     <span className="flex-shrink-0">{matchingItems.has(item) ? '✓' : '○'}</span>{item}
                   </li>
                 ))}
@@ -128,10 +128,10 @@ export function InsightsTab({ data }: InsightsTabProps) {
       <Card>
         <h3 className="text-sm font-semibold text-primary mb-2">Analysis summary</h3>
         <p className="text-sm text-secondary leading-relaxed mb-3">{gapAnalysis.strengths_summary}</p>
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-[var(--danger)] bg-opacity-10 border border-[var(--danger)] border-opacity-20">
-          <span className="text-[var(--danger)] text-sm flex-shrink-0">⚠</span>
-          <p className="text-xs text-white">
-            <span className="font-medium text-white">Biggest gap: </span>{gapAnalysis.biggest_gap}
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-background border border-border">
+          <span className="text-muted text-sm flex-shrink-0">⚠</span>
+          <p className="text-xs text-secondary">
+            <span className="font-medium text-primary">Biggest gap: </span>{gapAnalysis.biggest_gap}
           </p>
         </div>
       </Card>

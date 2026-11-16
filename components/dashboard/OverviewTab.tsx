@@ -128,7 +128,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
               <div className="space-y-1">
                 {skillExtraction.strengths.slice(0, 3).map((s) => (
                   <p key={s} className="text-xs text-secondary flex items-start gap-1.5">
-                    <span className="text-[var(--success)] mt-0.5">•</span>{s}
+                    <span className="text-muted mt-0.5">•</span>{s}
                   </p>
                 ))}
               </div>

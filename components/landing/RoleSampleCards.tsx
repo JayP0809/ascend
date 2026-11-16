@@ -74,7 +74,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted">Starting readiness</span>
-                    <Badge variant={item.readiness >= 75 ? 'success' : 'warning'}>
+                    <Badge variant="outline">
                       {item.readiness}%
                     </Badge>
                   </div>
