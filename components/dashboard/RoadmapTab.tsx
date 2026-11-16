@@ -173,7 +173,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
 
                           {/* Resources */}
                           <div>
-                            <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Resources</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--gold)' }}>Resources</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {phase.resources.map((r) => (
                                 <a
@@ -181,22 +181,25 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                                   href={r.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:border-accent hover:bg-background transition-colors group"
+                                  className="flex items-center gap-2 p-2.5 rounded-lg border transition-colors group"
+                                  style={{ borderColor: 'var(--gold-light)', background: 'var(--gold-light)' }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--gold-light)'; }}
                                 >
-                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
-                                    <span className="text-xs font-bold text-muted">{r.type[0]}</span>
+                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'var(--gold-light)' }}>
+                                    <span className="text-xs font-bold" style={{ color: 'var(--gold)' }}>{r.type[0]}</span>
                                   </div>
                                   <span className="text-xs text-secondary group-hover:text-primary transition-colors flex-1 min-w-0 truncate">{r.title}</span>
-                                  <ExternalLink className="h-3 w-3 text-muted flex-shrink-0" />
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--gold)' }} />
                                 </a>
                               ))}
                             </div>
                           </div>
 
                           {/* Project */}
-                          <div className="bg-background rounded-xl p-4 border border-border">
+                          <div className="rounded-xl p-4 border" style={{ background: 'var(--emerald-light)', borderColor: 'var(--emerald)' }}>
                             <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-semibold text-muted uppercase tracking-wide">Project</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--emerald-text)' }}>Project</p>
                               <div className="flex items-center gap-1 text-xs text-muted">
                                 <Clock className="h-3 w-3" />
                                 ~{phase.project.hours}h
