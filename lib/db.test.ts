@@ -2,12 +2,14 @@
  * Database layer tests.
  *
  * These tests verify the behavior of lib/db.ts without a live database.
- * When DATABASE_URL is not set (the default in local dev without Neon),
- * all db functions must return safe empty/null values and not throw.
+ * When TEST_DATABASE_URL is not set (the default), integration tests are
+ * skipped so the production database is never modified by the test suite.
  *
- * To run against a real database, set DATABASE_URL before running tests.
- * Integration tests that require a real DB are marked with the [integration]
- * tag and skipped when DATABASE_URL is absent.
+ * To run integration tests against an isolated database:
+ *   TEST_DATABASE_URL=<isolated-db-url> npm test
+ *
+ * Never set TEST_DATABASE_URL to the production DATABASE_URL — integration
+ * tests write and seed data and do not clean up after every case.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -18,7 +20,13 @@ import {
   isDbAvailable,
 } from './db';
 
-const HAS_DB = !!process.env.DATABASE_URL;
+// Integration tests require an explicitly isolated database URL.
+// Never use DATABASE_URL (production) — set TEST_DATABASE_URL instead.
+// When TEST_DATABASE_URL is set, forward it to DATABASE_URL so the db-client
+// module connects to the isolated database, not production.
+const TEST_DB_URL = process.env.TEST_DATABASE_URL;
+if (TEST_DB_URL) process.env.DATABASE_URL = TEST_DB_URL;
+const HAS_DB = !!TEST_DB_URL;
 
 // ---------------------------------------------------------------------------
 // No-database behavior (always runs in CI)
@@ -120,7 +128,7 @@ describe('quota — pure logic', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration tests — only run when DATABASE_URL is set
+// Integration tests — only run when TEST_DATABASE_URL is set
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!HAS_DB)('[integration] db — live PostgreSQL', () => {

@@ -7,8 +7,8 @@
  *   3. Quota enforcement — pure logic (no DB), atomic reservation model
  *   4. Auth module flags — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE semantics
  *
- * Tests that require a live database or Clerk session are tagged [integration]
- * or [live-auth] and are either skipped or documented as manual steps below.
+ * Tests that require a live database are tagged [integration] and only run
+ * when TEST_DATABASE_URL is set — never against the production DATABASE_URL.
  *
  * Tests marked with a comment "// SIMULATED" reason about the authorization
  * logic using the exported helper, NOT about an HTTP round-trip. They do not
@@ -19,7 +19,13 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { checkAnalysisAccess } from './auth';
 import type { AuthUser } from './auth';
 
-const HAS_DB   = !!process.env.DATABASE_URL;
+// Integration tests require an explicitly isolated database URL.
+// Never use DATABASE_URL (production) — set TEST_DATABASE_URL instead.
+// The test suite reads TEST_DATABASE_URL for direct neon() calls and also
+// sets DATABASE_URL=TEST_DATABASE_URL so the db-client module uses it too.
+const TEST_DB_URL = process.env.TEST_DATABASE_URL;
+if (TEST_DB_URL) process.env.DATABASE_URL = TEST_DB_URL;
+const HAS_DB   = !!TEST_DB_URL;
 const HAS_AUTH = !!(process.env.AUTH_SECRET && process.env.AUTH_GOOGLE_ID);
 
 // ---------------------------------------------------------------------------
@@ -502,7 +508,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 
   beforeAll(async () => {
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u = new URL(rawUrl);
     u.hostname = u.hostname.replace('-pooler', '');
     u.searchParams.delete('channel_binding');
@@ -653,7 +659,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 
   beforeAll(async () => {
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u = new URL(rawUrl);
     u.hostname = u.hostname.replace('-pooler', '');
     u.searchParams.delete('channel_binding');
@@ -948,7 +954,7 @@ describe.skipIf(!HAS_DB)('[integration] global quota — atomic reservation in g
   it('refund decrements the global counter', async () => {
     const { reserveGlobalQuotaSlot, refundGlobalQuotaSlot } = await import('./quota');
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u = new URL(rawUrl);
     u.hostname = u.hostname.replace('-pooler', '');
     u.searchParams.delete('channel_binding');
@@ -1002,7 +1008,7 @@ describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempote
 
   beforeAll(async () => {
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u = new URL(rawUrl);
     u.hostname = u.hostname.replace('-pooler', '');
     u.searchParams.delete('channel_binding');
@@ -1056,7 +1062,7 @@ describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempote
   it('stale processing claim (>2 min) is reclaimable', async () => {
     const { claimAnalysisSlot } = await import('./db');
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u2 = new URL(rawUrl);
     u2.hostname = u2.hostname.replace('-pooler', '');
     u2.searchParams.delete('channel_binding');
@@ -1081,7 +1087,7 @@ describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempote
   it('complete analysis claim returns complete — allows cached-result short-circuit', async () => {
     const { claimAnalysisSlot } = await import('./db');
     const { neon } = await import('@neondatabase/serverless');
-    const rawUrl = process.env.DATABASE_URL!;
+    const rawUrl = TEST_DB_URL!;
     const u3 = new URL(rawUrl);
     u3.hostname = u3.hostname.replace('-pooler', '');
     u3.searchParams.delete('channel_binding');

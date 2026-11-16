@@ -107,7 +107,7 @@ Active development branch: `phase-1a` (Milestones 1 + 2 complete — not yet com
 
 ### Milestone 3 — Production Architecture Proposal (complete, pending approval)
 - Written as `docs/production-architecture-proposal.md`
-- Covers: DB (Neon+Drizzle), auth (Clerk), hosting (Vercel), rate limiting (Upstash), monitoring (Sentry)
+- Covers: DB (Neon+Drizzle), auth (Auth.js v5 + Google OAuth), hosting (Vercel), rate limiting (Upstash), monitoring (Sentry)
 - **Updated in current session** — zero-cost compliance matrix being researched and will replace the previous draft
 
 ---

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Identical authorization to GET /api/analyze: ownership required,
-  // fail-closed in production without Clerk, dev bypass in local dev only.
+  // fail-closed in production without Auth.js, dev bypass in local dev only.
   const user = await getCurrentUser(request);
   const access = checkAnalysisAccess(record, user);
   if (!access.granted) {
