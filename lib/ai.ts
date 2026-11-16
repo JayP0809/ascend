@@ -23,27 +23,26 @@ const DEMO_ANALYSIS_ID = 'demo-analysis-001';
 // ---------------------------------------------------------------------------
 const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
-// Per-step timeouts. Vercel Hobby maxDuration = 60 s (hard ceiling).
+// Per-step timeouts. Vercel Hobby with Fluid Compute supports up to 300 s.
 //
 // Execution order: Promise.all([extractSkills, getRoleRequirements]) → analyzeGap
 //   → roadmapBatch1 → roadmapBatch2 (the last two are sequential, not parallel).
 //
-// Worst-case wall time must fit inside 55 s (5 s buffer before Vercel kills the
-// function and prevents our error handler from refunding quota):
-//   Phase A (parallel):  max(15, 15)  = 15 s
-//   Phase B (analyzeGap):             = 12 s
-//   Phase C (batch1 + batch2):  14+14 = 28 s
-//   Total worst case:                 = 55 s ✓
+// Worst-case wall time:
+//   Phase A (parallel):  max(25, 25)  = 25 s
+//   Phase B (analyzeGap):             = 20 s
+//   Phase C (batch1 + batch2):  30+30 = 60 s
+//   Total worst case:                 = 105 s (well within 300 s)
 //
 // Groq's current free model (openai/gpt-oss-20b) typically responds in 2-8 s
-// per call, so these ceilings provide 2-7× headroom over observed latency.
+// per call, so these ceilings provide 3-10× headroom over observed latency.
 const TIMEOUT_MS: Record<string, number> = {
-  extractSkills:        15_000,
-  getRoleRequirements:  15_000,
-  analyzeGap:           12_000,
-  roadmapBatch1:        14_000,
-  roadmapBatch2:        14_000,
-  default:              14_000,
+  extractSkills:        25_000,
+  getRoleRequirements:  25_000,
+  analyzeGap:           20_000,
+  roadmapBatch1:        30_000,
+  roadmapBatch2:        30_000,
+  default:              30_000,
 };
 
 // Per-step max_tokens.

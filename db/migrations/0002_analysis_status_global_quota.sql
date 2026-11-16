@@ -1,6 +1,9 @@
 -- Migration 0002: analysis request-state tracking + global quota table
 -- Safe / reversible — only adds columns and a new table; no rows are deleted.
--- Run with: psql $DATABASE_URL -f db/migrations/0002_analysis_status_global_quota.sql
+--
+-- PREFERRED: Run via `npm run db:migrate` (uses drizzle/migrations/0002_*.sql).
+-- MANUAL:    psql $DIRECT_DATABASE_URL -f db/migrations/0002_analysis_status_global_quota.sql
+--            (Use DIRECT_DATABASE_URL, not DATABASE_URL — pooled connections cannot run DDL.)
 --
 -- Pre-deployment requirement: this migration MUST be applied to the Neon
 -- database before deploying the Milestone 4 code that uses these columns.

@@ -8,12 +8,10 @@ import { reserveQuotaSlot, refundQuotaSlot, reserveGlobalQuotaSlot, refundGlobal
 import { AnalysisResult } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
-// Tell Vercel to allow up to 60 seconds for this route (Hobby tier maximum).
-// The AI pipeline runs 5 sequential/parallel Groq calls; typical latency is
-// 15-30 seconds. If Groq is slow or retrying, the function may hit this limit.
+// Vercel Hobby with Fluid Compute enabled supports up to 300 seconds.
+// The AI pipeline worst-case is ~105 s (25+20+30+30 s with Fluid Compute timeouts).
 // Users see a timeout error and their quota slot is refunded automatically.
-// See docs/production-architecture-proposal.md for latency analysis.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // ---------------------------------------------------------------------------
 // In-memory dedup guard (fallback for pre-migration environments)
@@ -125,9 +123,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 'unavailable': status column not yet migrated. Fall back to in-memory guard.
+  // 'unavailable': status column not yet migrated.
+  // In production, fail closed — the in-memory Set cannot guard across Vercel
+  // instances, so allowing the request would risk concurrent duplicate runs.
+  // In development/staging a single instance is acceptable; use the in-memory guard.
   const usingFallbackDedup = claim === 'unavailable';
   if (usingFallbackDedup) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Service unavailable: database migration 0002 has not been applied. Contact the site administrator.' },
+        { status: 503 }
+      );
+    }
     if (inFlightAnalyses.has(analysisId)) {
       return NextResponse.json(
         { error: 'An analysis is already in progress for this resume. Please wait a moment, then refresh.' },
