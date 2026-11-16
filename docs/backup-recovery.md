@@ -6,7 +6,7 @@ Ascend stores data in Neon PostgreSQL (free tier). This document describes how t
 
 ## Recovery options
 
-### Option A — Neon branch (point-in-time snapshot, preferred)
+### Option A: Neon branch (point-in-time snapshot, preferred)
 
 Neon's free tier supports up to 10 branches. A branch is a copy-on-write snapshot of the database at the time it is created. Creating one before a migration or destructive operation gives you a one-click restore path in the Neon console.
 
@@ -34,7 +34,7 @@ curl -s -X DELETE "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/br
   -H "Authorization: Bearer $NEON_API_KEY"
 ```
 
-### Option B — Node.js data export (no extra credentials)
+### Option B: Node.js data export (no extra credentials)
 
 Exports all rows from every table to a JSON file. Does not capture sequences, indexes, or in-flight transactions; sufficient for the current schema (append-only user data).
 
@@ -42,7 +42,7 @@ Exports all rows from every table to a JSON file. Does not capture sequences, in
 node --env-file=.env.local scripts/export-backup.mjs > backup-$(date +%Y%m%d).json
 ```
 
-The export script below reads every application table and writes valid JSON to stdout. Redirect it to a file outside the repository (never commit backup files — they contain user email addresses and resume content).
+The export script below reads every application table and writes valid JSON to stdout. Redirect it to a file outside the repository (never commit backup files: they contain user email addresses and resume content).
 
 **`scripts/export-backup.mjs`** (create if absent):
 ```js
@@ -92,7 +92,7 @@ For small datasets (portfolio scale), this is a manual but tractable operation.
 
 ## Important
 
-- **Never commit backup files** — they contain user PII (email addresses) and resume text.
+- **Never commit backup files**: they contain user PII (email addresses) and resume text.
 - Add `*.json.backup`, `backup-*.json` to `.gitignore` if you create regular exports.
 - Neon branches are the preferred recovery path for migrations; keep at most 2–3 at a time to stay within the free-tier limit of 10.
-- The migration runner (`scripts/migrate.mjs`) is idempotent — re-running it on a partially applied migration is safe.
+- The migration runner (`scripts/migrate.mjs`) is idempotent: re-running it on a partially applied migration is safe.

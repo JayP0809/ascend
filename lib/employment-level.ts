@@ -5,7 +5,7 @@ const INTERN_TITLE_RE = /\bintern(?:ship)?\b|\bco-?op\b|\bcooperative education\
 
 // Signals in JD body indicating the writer will *supervise* interns,
 // not that the reader IS an intern.  Guards against false positives like
-// "Senior Engineer — will mentor interns on the team."
+// "Senior Engineer: will mentor interns on the team."
 const MENTORING_INTERN_RE = /\b(?:mentor(?:ing)?|supervise?|supervising|manage[sd]?|managing|guide[sd]?|guiding|coach(?:ing)?)\s+interns?\b/i;
 
 // Explicit seniority signals that override intern detection in body text.
@@ -51,7 +51,7 @@ export function classifyEmploymentLevel(
   // Seniority in JD overrides intern detection in the body (but not the title).
   const hasSeniorSignal = SENIOR_RE.test(jobDescription);
 
-  // Role title is highest-weight signal — not affected by senior override.
+  // Role title is highest-weight signal: not affected by senior override.
   if (INTERN_TITLE_RE.test(targetRole)) {
     if (/\bco-?op\b|\bcooperative\b/i.test(targetRole)) {
       signals.push('"co-op" in role title');
@@ -74,7 +74,7 @@ export function classifyEmploymentLevel(
     return { level: 'internship', confidence: 'high', inferredFrom: 'job_description', signals };
   }
 
-  // Full JD body — guard against "mentors interns" false positives.
+  // Full JD body: guard against "mentors interns" false positives.
   const isMentoringContext = MENTORING_INTERN_RE.test(jobDescription);
   const internInBody = INTERN_TITLE_RE.test(jobDescription);
 

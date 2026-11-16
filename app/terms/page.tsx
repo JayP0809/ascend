@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Ascend',
+  title: 'Terms of Service | Ascend',
   description: 'Terms of Service for Ascend, the AI career navigation application.',
 };
 

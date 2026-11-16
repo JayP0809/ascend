@@ -94,7 +94,7 @@ function evalDemoDataIntegrity(): EvalResult[] {
     results.push({
       name: `market_demand_deterministic:${jd.id}`,
       passed: deterministic,
-      details: deterministic ? 'outputs match across two calls' : 'MISMATCH — non-deterministic output detected',
+      details: deterministic ? 'outputs match across two calls' : 'MISMATCH: non-deterministic output detected',
     });
   }
 
@@ -125,7 +125,7 @@ function evalSchemaValidation(): EvalResult[] {
   const r3 = GapAnalysisSchema.safeParse(badGap);
   results.push({ name: 'schema_gap_score_out_of_range', passed: !r3.success, details: !r3.success ? 'correctly rejected score=150' : 'SHOULD HAVE FAILED' });
 
-  // demand_level removed from schema (v1.4.0) — model returning non-canonical
+  // demand_level removed from schema (v1.4.0): model returning non-canonical
   // values like "Very High" should no longer cause failures.
   const roleWithExtraDemandLevel = {
     required_skills: ['Python'],
@@ -141,7 +141,7 @@ function evalSchemaValidation(): EvalResult[] {
     passed: r4.success,
     details: r4.success
       ? 'demand_level="Very High" correctly stripped (was previously causing validation failures)'
-      : `REGRESSION: validation unexpectedly failed — ${r4.error?.message}`,
+      : `REGRESSION: validation unexpectedly failed: ${r4.error?.message}`,
   });
 
   return results;
@@ -177,7 +177,7 @@ function evalEmploymentLevelClassification(): EvalResult[] {
 }
 
 function evalProgressionDeterminism(): EvalResult[] {
-  // Tested in scorer.test.ts — just verify the demo data produces stable progression
+  // Tested in scorer.test.ts: just verify the demo data produces stable progression
   const demo = getDemoData();
   const d1 = buildDashboardData(demo).progressionData;
   const d2 = buildDashboardData(demo).progressionData;
@@ -287,7 +287,7 @@ async function evalLiveRoadmapGeneration(): Promise<EvalResult[]> {
   const { runAnalysis } = await import('../lib/ai');
 
   // Use the junior-swe fixture (closest to a typical FE candidate) with
-  // the frontend-developer JD — the most skill-gap-heavy combination.
+  // the frontend-developer JD: the most skill-gap-heavy combination.
   const resume = RESUME_FIXTURES[0]; // junior-swe
   const jd = JOB_FIXTURES.find((j) => j.id === 'frontend-developer')!;
 
@@ -425,7 +425,7 @@ async function evalLiveInternshipPipeline(): Promise<EvalResult[]> {
     });
 
     // Internship scores should generally be lower than experienced-role scores
-    // (not a hard failure — just a warning metric)
+    // (not a hard failure: just a warning metric)
     results.push({
       name: `live_intern_score_plausibly_low`,
       passed: score <= 70, // students typically have significant gaps

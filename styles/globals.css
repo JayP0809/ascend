@@ -71,7 +71,7 @@ a {
   background: var(--text-muted);
 }
 
-/* Hero content entrance animation — applied only after client mount.
+/* Hero content entrance animation: applied only after client mount.
    Content renders visible (opacity: 1) in SSR HTML; CSS class is added
    by useEffect so the animation only fires client-side. This prevents the
    blank-page issue caused by framer-motion writing opacity:0 to SSR HTML. */
@@ -161,12 +161,12 @@ textarea {
   box-shadow: var(--shadow-lg) !important;
 }
 
-/* Accent text — single color, no gradient */
+/* Accent text: single color, no gradient */
 .gradient-text {
   color: var(--accent);
 }
 
-/* Glassmorphism card — simplified to flat */
+/* Glassmorphism card: simplified to flat */
 .glass-card {
   background: var(--bg-card);
   border: 0.5px solid var(--border);

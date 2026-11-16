@@ -98,7 +98,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // can enforce IDOR checks without relying on a later binding step.
     const user = await getCurrentUser(request);
 
-    // Save resume text — empty result_json placeholder, will be filled by /api/analyze
+    // Save resume text: empty result_json placeholder, will be filled by /api/analyze
     await saveAnalysis(analysisId, truncated, '', null, 0, '{}', { userId: user?.userId });
 
     return NextResponse.json({

@@ -56,7 +56,7 @@ const VALID_ROLE_JSON = JSON.stringify({
   categories: { technical: ['Docker'], soft: ['Communication'], tools: ['Git'], certifications: [] },
   typical_timeline_months: 6,
   avg_salary: '$120,000',
-  // demand_level removed in v1.4.0 — no longer in schema or prompt
+  // demand_level removed in v1.4.0: no longer in schema or prompt
 });
 
 const VALID_GAP_JSON = JSON.stringify({
@@ -69,7 +69,7 @@ const VALID_GAP_JSON = JSON.stringify({
 });
 
 // Batch responses: each needs exactly 4 phases.
-// Week numbers don't need to be exact — fixWeeks() in the pipeline overwrites them.
+// Week numbers don't need to be exact: fixWeeks() in the pipeline overwrites them.
 function makePhase(n: number) {
   return {
     week_start: n * 2 - 1,
@@ -183,10 +183,10 @@ describe('successful pipeline', () => {
 
   it('runs the full pipeline with 2 roadmap batches and returns 8 phases', async () => {
     // Pipeline call order:
-    //  1 & 2  — extractSkills + getRoleRequirements (concurrent)
-    //  3      — analyzeGap
-    //  4      — roadmapBatch1 (phases 1-4)
-    //  5      — roadmapBatch2 (phases 5-8)
+    //  1 & 2 : extractSkills + getRoleRequirements (concurrent)
+    //  3     : analyzeGap
+    //  4     : roadmapBatch1 (phases 1-4)
+    //  5     : roadmapBatch2 (phases 5-8)
     mockCreate
       .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))   // 1 extractSkills
       .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))    // 2 getRoleRequirements
@@ -340,7 +340,7 @@ describe('batched roadmap generation', () => {
 // ---------------------------------------------------------------------------
 // Schema unit tests (no Groq calls)
 // ---------------------------------------------------------------------------
-describe('ResourceSchema — type normalization', () => {
+describe('ResourceSchema: type normalization', () => {
   const valid = { title: 'T', url: 'https://example.com', type: '' };
 
   it.each([
@@ -378,7 +378,7 @@ describe('ResourceSchema — type normalization', () => {
   });
 });
 
-describe('RoadmapBatchSchema — exact phase count', () => {
+describe('RoadmapBatchSchema: exact phase count', () => {
   const makeRaw = (count: number) => ({
     weeks: Array.from({ length: count }, (_, i) => ({
       week_start: i * 2 + 1,
@@ -408,7 +408,7 @@ describe('RoadmapBatchSchema — exact phase count', () => {
 // skill-heavy roles. Fix: exactly 3 topics + 1 resource per phase, with
 // explicit word-count limits for focus_area, description, tech, milestone.
 // ---------------------------------------------------------------------------
-describe('roadmap prompt — token budget constraints', () => {
+describe('roadmap prompt: token budget constraints', () => {
   // A large missing_critical list similar to what Frontend Developer produces.
   const frontendGap = {
     missing_critical: [
@@ -477,7 +477,7 @@ describe('roadmap prompt — token budget constraints', () => {
 // ---------------------------------------------------------------------------
 // Employment level context in prompts
 // ---------------------------------------------------------------------------
-describe('roadmap prompt — employment level context', () => {
+describe('roadmap prompt: employment level context', () => {
   const baseGap = {
     missing_critical: ['React', 'TypeScript'],
     missing_nice: [],
@@ -540,13 +540,13 @@ describe('roadmap prompt — employment level context', () => {
 // The roadmap prompt must cap missing_critical at 12 to prevent inflated
 // output that could exceed token budgets or produce unfocused roadmaps.
 // ---------------------------------------------------------------------------
-describe('roadmap prompt — missing_critical cap', () => {
+describe('roadmap prompt: missing_critical cap', () => {
   const internshipGap = {
     missing_critical: [
       'OOP', 'Data Structures', 'Algorithms', 'Version Control', 'SQL',
       'REST APIs', 'Testing', 'Debugging', 'Java', 'Linux', 'Networking',
       'Databases', 'Web Development', 'JavaScript', 'React', 'Node.js',
-      'Git', 'AWS', 'Docker', 'CI/CD', // 20 items — exceeds the cap
+      'Git', 'AWS', 'Docker', 'CI/CD', // 20 items: exceeds the cap
     ],
     missing_nice: ['Kubernetes', 'TypeScript'],
     transferable: ['Python'],
@@ -601,13 +601,13 @@ describe('roadmap prompt — missing_critical cap', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Regression: role-specific schema validation — no demand_level (v1.4.0)
+// Regression: role-specific schema validation: no demand_level (v1.4.0)
 //
 // RoleRequirementsSchema must succeed without demand_level and must NOT
 // validate it even when the model returns it (the extra field is ignored
 // by Zod's default strip behavior).
 // ---------------------------------------------------------------------------
-describe('RoleRequirementsSchema — demand_level removed', () => {
+describe('RoleRequirementsSchema: demand_level removed', () => {
   it('passes without demand_level', () => {
     const result = RoleRequirementsSchema.safeParse({
       required_skills: ['Python', 'React'],
@@ -626,7 +626,7 @@ describe('RoleRequirementsSchema — demand_level removed', () => {
       categories: { technical: [], soft: [], tools: [], certifications: [] },
       typical_timeline_months: 6,
       avg_salary: '$100,000',
-      demand_level: 'High', // model might still return this — must not break validation
+      demand_level: 'High', // model might still return this: must not break validation
     });
     expect(result.success).toBe(true);
     // The extra field is stripped by Zod's default behavior
@@ -636,7 +636,7 @@ describe('RoleRequirementsSchema — demand_level removed', () => {
   });
 
   it('passes when model returns non-canonical demand_level (not in old enum)', () => {
-    // "Very High" previously caused validation failure — now it's just stripped
+    // "Very High" previously caused validation failure: now it's just stripped
     const result = RoleRequirementsSchema.safeParse({
       required_skills: ['Python'],
       nice_to_have: [],
@@ -654,7 +654,7 @@ describe('RoleRequirementsSchema — demand_level removed', () => {
 // ---------------------------------------------------------------------------
 const HAS_GROQ = !!(process.env.GROQ_API_KEY);
 
-describe.skipIf(!HAS_GROQ)('[integration] live Groq API — basic connectivity', () => {
+describe.skipIf(!HAS_GROQ)('[integration] live Groq API: basic connectivity', () => {
   it('isLiveMode() returns true when API key is set', () => {
     expect(isLiveMode()).toBe(true);
   });

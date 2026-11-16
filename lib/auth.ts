@@ -9,7 +9,7 @@
  * for all analysis read/export operations. It enforces fail-closed behavior:
  *
  *   Dev mode (Auth.js absent + NODE_ENV !== 'production'):
- *     All operations allowed — single-user local development.
+ *     All operations allowed: single-user local development.
  *
  *   Production without Auth.js (misconfigured):
  *     All private operations denied with 503. Demo remains public.
@@ -18,7 +18,7 @@
  *   Auth.js configured:
  *     Authenticated user + owned analysis → allowed.
  *     Everything else (wrong user, ownerless record, unauthenticated) → denied.
- *     Ownerless records are PRIVATE by default — there is no "public" record
+ *     Ownerless records are PRIVATE by default: there is no "public" record
  *     concept other than demo IDs (handled before this function is called).
  *
  * NEVER trust a user ID from the request body or query string.
@@ -42,7 +42,7 @@ export const AUTH_CONFIGURED = !!(
  * Returns true if the authenticated user's email matches the server-side admin
  * email configured via ADMIN_EMAIL.
  *
- * ADMIN_EMAIL is a server-only env var — never in the client bundle.
+ * ADMIN_EMAIL is a server-only env var: never in the client bundle.
  * The email argument must come from getCurrentUser() (a verified JWT session),
  * never from request body, query string, or any client-controlled source.
  *
@@ -70,7 +70,7 @@ export type AccessResult =
  * Checks whether a request may access the analysis identified by `record`.
  *
  * Call this for every read, export, update, or deletion of a stored analysis.
- * Demo IDs must be handled BEFORE this call — they bypass the DB entirely.
+ * Demo IDs must be handled BEFORE this call: they bypass the DB entirely.
  *
  * Returns `{ granted: true }` or `{ granted: false, status, message }`.
  * On false the caller must return a NextResponse with the given status.
@@ -112,7 +112,7 @@ export function checkAnalysisAccess(
 
 /**
  * Returns the authenticated user for the current request, or null.
- * Never throws — auth failure is treated as unauthenticated.
+ * Never throws: auth failure is treated as unauthenticated.
  *
  * Reads the Auth.js JWT session cookie and returns userId + providerId that
  * were stored in the token during sign-in (no DB lookup required here).
@@ -161,10 +161,10 @@ export function requiresAuth(analysisId: string | undefined): boolean {
  */
 export function isSafeCallbackUrl(url: unknown): url is string {
   if (typeof url !== 'string' || !url) return false;
-  // Must start with exactly one slash — not protocol-relative (//) and not
+  // Must start with exactly one slash: not protocol-relative (//) and not
   // something that only looks like a path after percent-decoding.
   if (!url.startsWith('/') || url.startsWith('//')) return false;
-  // Reject backslash — some redirect handlers treat it as / and allow escape.
+  // Reject backslash: some redirect handlers treat it as / and allow escape.
   if (url.includes('\\')) return false;
   // Check the decoded form does not escape the origin.
   try {
@@ -174,9 +174,9 @@ export function isSafeCallbackUrl(url: unknown): url is string {
   } catch {
     return false; // malformed %-encoding
   }
-  // Reject API routes — meaningless as redirect destinations.
+  // Reject API routes: meaningless as redirect destinations.
   if (url.startsWith('/api/')) return false;
-  // Reject auth routes — prevents infinite redirect loops.
+  // Reject auth routes: prevents infinite redirect loops.
   if (url.startsWith('/sign-in') || url.startsWith('/sign-up')) return false;
   return true;
 }

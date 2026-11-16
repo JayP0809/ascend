@@ -2,7 +2,7 @@
  * Database access layer.
  *
  * Wraps Drizzle ORM (PostgreSQL). When DATABASE_URL is not configured,
- * all write operations are silent no-ops and reads return empty results —
+ * all write operations are silent no-ops and reads return empty results :
  * demo mode runs entirely without a database connection.
  *
  * The same external interface is preserved so API routes do not change.
@@ -59,7 +59,7 @@ export async function saveAnalysis(
       readinessScore,
       resultJson,
       isDemoMode: options.isDemoMode ?? false,
-      // Intentionally not resetting status — an in-progress analysis should
+      // Intentionally not resetting status: an in-progress analysis should
       // not be interrupted by a concurrent upload retry on the same ID.
     },
   });
@@ -109,7 +109,7 @@ export async function claimAnalysisSlot(
 
     if ((result.rowCount ?? 0) > 0) return 'claimed';
 
-    // Claim failed — read current status to tell the caller why.
+    // Claim failed: read current status to tell the caller why.
     const rows = await db.execute(sql`
       SELECT status FROM analyses WHERE id = ${id}::uuid LIMIT 1
     `);
@@ -125,7 +125,7 @@ export async function claimAnalysisSlot(
 }
 
 /**
- * Releases a processing claim — sets status back to 'pending' for retryable
+ * Releases a processing claim: sets status back to 'pending' for retryable
  * failures or to 'failed' for non-retryable ones.
  * Silent no-op when db is absent or the status column does not exist yet.
  */
@@ -143,7 +143,7 @@ export async function releaseAnalysisClaim(
              processing_started_at = NULL
        WHERE id = ${id}::uuid AND status = 'processing'
     `);
-  } catch { /* status column not yet migrated — silent */ }
+  } catch { /* status column not yet migrated: silent */ }
 }
 
 /**
@@ -465,7 +465,7 @@ export async function countTotalRecentAnalyses(since: Date): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// Global Groq request quota — atomic reservation in global_quota_buckets
+// Global Groq request quota: atomic reservation in global_quota_buckets
 // Counts Groq *attempts*, not completions, so failed requests that consumed
 // provider tokens are charged against the monthly budget.
 // ---------------------------------------------------------------------------
@@ -505,7 +505,7 @@ export async function reserveGlobalQuotaSlot(limitVal: number): Promise<GlobalQu
 
     const rows = result.rows as Array<{ count: number; limit_val: number }>;
     if (rows.length === 0) {
-      // cap reached — read current count for the error message
+      // cap reached: read current count for the error message
       const cur = await db.execute(sql`
         SELECT count, limit_val FROM global_quota_buckets WHERE bucket_key = ${bucket} LIMIT 1
       `);
@@ -522,14 +522,14 @@ export async function reserveGlobalQuotaSlot(limitVal: number): Promise<GlobalQu
 
     return { allowed: true, used: rows[0].count, limit: rows[0].limit_val };
   } catch {
-    // Table does not exist yet (pre-migration). Allow through — the per-user
+    // Table does not exist yet (pre-migration). Allow through: the per-user
     // quota remains authoritative for per-user limits.
     return { allowed: true };
   }
 }
 
 /**
- * Refunds one global slot — called when Groq never completed (timeout, network
+ * Refunds one global slot: called when Groq never completed (timeout, network
  * error, validation failure). Silent no-op when table is absent.
  */
 export async function refundGlobalQuotaSlot(): Promise<void> {
@@ -543,7 +543,7 @@ export async function refundGlobalQuotaSlot(): Promise<void> {
          SET count = GREATEST(count - 1, 0)
        WHERE bucket_key = ${bucket}
     `);
-  } catch { /* pre-migration — silent */ }
+  } catch { /* pre-migration: silent */ }
 }
 
 function currentMonthBucket(): string {
@@ -554,7 +554,7 @@ function currentMonthBucket(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Legacy synchronous shim — kept for internal transition period.
+// Legacy synchronous shim: kept for internal transition period.
 // The old `db` export is replaced by named async functions above.
 // This shim re-exports the same shape for any code that hasn't been updated yet.
 // ---------------------------------------------------------------------------

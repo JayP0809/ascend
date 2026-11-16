@@ -1,6 +1,6 @@
 -- Migration 0002: analysis request-state tracking + global quota table
 -- Apply after 0001_usage_buckets.sql
--- Safe / reversible — only adds columns and a new table; no rows are deleted.
+-- Safe / reversible: only adds columns and a new table; no rows are deleted.
 --
 -- Rollback: ALTER TABLE analyses DROP COLUMN status, processing_started_at;
 --           DROP TABLE global_quota_buckets;

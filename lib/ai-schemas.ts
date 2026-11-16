@@ -6,10 +6,10 @@ import { RESOURCE_TYPES, type ResourceType } from './types';
 // Bump PROMPT_VERSION when any prompt text changes so eval results stay
 // traceable to the exact prompt that generated them.
 // ---------------------------------------------------------------------------
-// 1.3.0 — employment level context added to role-requirements, gap-analysis,
+// 1.3.0: employment level context added to role-requirements, gap-analysis,
 //          and roadmap prompts; calibrates AI output for internship/co-op/entry-level
 //          targets vs. full-time experienced roles.
-// 1.4.0 — removed demand_level from role-requirements prompt and schema (field
+// 1.4.0: removed demand_level from role-requirements prompt and schema (field
 //          was unused in UI; model returned non-canonical values causing failures);
 //          increased analyzeGap budget; capped missing_critical at 12 in roadmap
 //          prompt; tightened internship instruction to prevent output verbosity.
@@ -38,7 +38,7 @@ export const RoleRequirementsSchema = z.object({
   }),
   typical_timeline_months: z.number().int().min(1).max(60),
   avg_salary: z.string(),
-  // demand_level removed in v1.4.0 — not used in UI, caused validation failures
+  // demand_level removed in v1.4.0: not used in UI, caused validation failures
   // when model returned non-canonical values ("Very High", "HIGH Demand", etc.)
 });
 
@@ -106,7 +106,7 @@ export const RoadmapResponseSchema = z.object({
   weeks: z.array(RoadmapWeekSchema).min(1),
 });
 
-// Schema for a single roadmap batch.  Exactly 4 phases are required — the
+// Schema for a single roadmap batch.  Exactly 4 phases are required: the
 // assembly step and fixWeeks() both assume this count, so Zod enforces it
 // at parse time rather than waiting for a runtime assembly error.
 export const RoadmapBatchSchema = z.object({

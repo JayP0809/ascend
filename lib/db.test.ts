@@ -8,7 +8,7 @@
  * To run integration tests against an isolated database:
  *   TEST_DATABASE_URL=<isolated-db-url> npm test
  *
- * Never set TEST_DATABASE_URL to the production DATABASE_URL — integration
+ * Never set TEST_DATABASE_URL to the production DATABASE_URL: integration
  * tests write and seed data and do not clean up after every case.
  */
 
@@ -21,7 +21,7 @@ import {
 } from './db';
 
 // Integration tests require an explicitly isolated database URL.
-// Never use DATABASE_URL (production) — set TEST_DATABASE_URL instead.
+// Never use DATABASE_URL (production): set TEST_DATABASE_URL instead.
 // lib/db-client.ts prefers TEST_DATABASE_URL over DATABASE_URL so no
 // env-var overwriting is needed here.
 const HAS_DB = !!process.env.TEST_DATABASE_URL;
@@ -30,14 +30,14 @@ const HAS_DB = !!process.env.TEST_DATABASE_URL;
 // No-database behavior (always runs in CI)
 // ---------------------------------------------------------------------------
 
-describe('db — no DATABASE_URL configured', () => {
+describe('db: no DATABASE_URL configured', () => {
   beforeAll(() => {
     // These tests rely on DATABASE_URL being absent.
     // If it is set, skip group by marking them conditionally.
   });
 
   it('isDbAvailable returns false when DATABASE_URL is not set', () => {
-    if (HAS_DB) return; // skip — DB is configured
+    if (HAS_DB) return; // skip: DB is configured
     expect(isDbAvailable()).toBe(false);
   });
 
@@ -86,10 +86,10 @@ describe('db — no DATABASE_URL configured', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Schema invariants (always run — no DB needed)
+// Schema invariants (always run: no DB needed)
 // ---------------------------------------------------------------------------
 
-describe('db schema — column name constants', () => {
+describe('db schema: column name constants', () => {
   it('schema file exports expected table names', async () => {
     const schema = await import('./schema');
     expect(schema.analyses).toBeDefined();
@@ -102,10 +102,10 @@ describe('db schema — column name constants', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Quota module — pure logic, no DB needed
+// Quota module: pure logic, no DB needed
 // ---------------------------------------------------------------------------
 
-describe('quota — pure logic', () => {
+describe('quota: pure logic', () => {
   it('demo flows are always allowed regardless of count', async () => {
     const { reserveQuotaSlot } = await import('./quota');
     const status = await reserveQuotaSlot(null, true);
@@ -126,11 +126,11 @@ describe('quota — pure logic', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration tests — only run when TEST_DATABASE_URL is set
+// Integration tests: only run when TEST_DATABASE_URL is set
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!HAS_DB)('[integration] db — live PostgreSQL', () => {
-  // Use valid UUIDs — Neon's analyses.id and community.id are UUID columns.
+describe.skipIf(!HAS_DB)('[integration] db: live PostgreSQL', () => {
+  // Use valid UUIDs: Neon's analyses.id and community.id are UUID columns.
   // userId is null so no FK constraint on users.id is needed.
   const testId = crypto.randomUUID();
 

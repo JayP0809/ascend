@@ -17,7 +17,7 @@ export const maxDuration = 300;
 // In-memory dedup guard (fallback for pre-migration environments)
 // When the status column is available (migration 0002 applied), claimAnalysisSlot()
 // provides atomic cross-instance dedup via PostgreSQL. This Set is only used
-// when that column is not yet present — it cannot guard across Vercel instances.
+// when that column is not yet present: it cannot guard across Vercel instances.
 // ---------------------------------------------------------------------------
 const inFlightAnalyses = new Set<string>();
 
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const claim = await claimAnalysisSlot(analysisId);
 
   if (claim === 'complete') {
-    // Another instance completed this analysis while we were waiting — return
+    // Another instance completed this analysis while we were waiting: return
     // the cached result rather than running Groq again.
     const recheckRecord = await getAnalysis(analysisId);
     if (recheckRecord?.result_json && recheckRecord.result_json !== '{}') {
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // 'unavailable': status column not yet migrated.
-  // In production, fail closed — the in-memory Set cannot guard across Vercel
+  // In production, fail closed: the in-memory Set cannot guard across Vercel
   // instances, so allowing the request would risk concurrent duplicate runs.
   // In development/staging a single instance is acceptable; use the in-memory guard.
   const usingFallbackDedup = claim === 'unavailable';
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // ── Global Groq budget (Item 1) ───────────────────────────────────────────
   // Atomically reserve one global slot BEFORE calling Groq.
-  // Counts attempts, not completions — failed requests that consumed provider
+  // Counts attempts, not completions: failed requests that consumed provider
   // tokens still use the budget. Refunded on network/timeout errors that do
   // not reach Groq at all; NOT refunded on model validation failures (tokens
   // were consumed even if the structured output was malformed).
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   if (quota.adminExempt) {
-    console.info('[quota] admin exemption used — slot tracked, limit not enforced');
+    console.info('[quota] admin exemption used: slot tracked, limit not enforced');
   }
 
   // ── AI pipeline ────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       user?.userId,
     );
 
-    // Anonymized community entry — fire and forget
+    // Anonymized community entry: fire and forget
     const topGap = result.gapAnalysis.missing_critical[0] || 'N/A';
     saveCommunityEntry(uuidv4(), targetRole, result.gapAnalysis.readiness_score, topGap, result.analysisId)
       .catch(() => { /* non-fatal */ });
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // tokens were consumed regardless of the DB error.
     if (!groqSucceeded) {
       refundQuotaSlot(user?.userId ?? null).catch(() => {});
-      // Refund global slot only for genuine network/timeout errors — not for
+      // Refund global slot only for genuine network/timeout errors: not for
       // validation failures (the model ran and consumed tokens).
       if (isRetryable) {
         refundGlobalQuotaSlot().catch(() => {});
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (error instanceof GroqTimeoutError) {
       return NextResponse.json(
-        { error: error.message, retryable: true, hint: 'Your quota slot was refunded — you can try again.' },
+        { error: error.message, retryable: true, hint: 'Your quota slot was refunded. You can try again.' },
         { status: 504 }
       );
     }
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     if (error instanceof GroqValidationError) {
       return NextResponse.json(
-        { error: error.message, retryable: true, hint: 'Your quota slot was refunded — you can try again.' },
+        { error: error.message, retryable: true, hint: 'Your quota slot was refunded. You can try again.' },
         { status: 500 }
       );
     }

@@ -10,7 +10,7 @@ import { ResumeDropzone } from '@/components/upload/ResumeDropzone';
 import { RoleSearch } from '@/components/upload/RoleSearch';
 import { AnalysisLoader } from '@/components/upload/AnalysisLoader';
 
-// Stable demo ID for the sample resume flow — matches the GET /api/analyze handler.
+// Stable demo ID for the sample resume flow: matches the GET /api/analyze handler.
 const DEMO_ANALYSIS_ID = 'demo-sample-001';
 
 type Step = 'upload' | 'resume-preview' | 'role' | 'analyzing';

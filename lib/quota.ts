@@ -4,14 +4,14 @@
  * Race-condition prevention:
  *   A single CTE atomically increments the usage_buckets counter OR inserts
  *   a new row for the month, but only when count < limit. If the limit is
- *   already reached, the statement returns no rows — quota denied.
+ *   already reached, the statement returns no rows: quota denied.
  *   Two concurrent requests cannot both succeed past the limit because the
  *   UPDATE's WHERE condition is evaluated under row-level locking.
  *
  * Quota policy:
  *   MONTHLY_ANALYSIS_QUOTA live analyses per authenticated user per calendar
  *   month. Configurable via ANALYSIS_QUOTA_PER_MONTH env var.
- *   Demo flows always bypass quota — they never call Groq.
+ *   Demo flows always bypass quota: they never call Groq.
  */
 
 import { sql } from 'drizzle-orm';
@@ -56,7 +56,7 @@ export interface QuotaStatus {
  * Returns allowed=true only if the slot was successfully reserved.
  *
  * Always returns allowed=true for demo flows (isDemoFlow=true) or when
- * userId is null (unauthenticated — before Auth.js is configured).
+ * userId is null (unauthenticated: before Auth.js is configured).
  *
  * When email matches ADMIN_EMAIL, the slot is tracked but the monthly limit
  * is not enforced. adminExempt=true is set on the result.
@@ -81,7 +81,7 @@ export async function reserveQuotaSlot(
 
   const db = getDbClient();
   if (!db) {
-    console.warn('[quota] No database available — quota not enforced in local dev mode.');
+    console.warn('[quota] No database available: quota not enforced in local dev mode.');
     return { allowed: true, used: 0, limit: MONTHLY_ANALYSIS_QUOTA, resetAt: endOfMonth(), adminExempt: admin || undefined };
   }
 
@@ -112,7 +112,7 @@ export async function reserveQuotaSlot(
   //     the update is skipped → RETURNING returns no rows → quota denied
   //
   // Concurrent first-requests race on the PRIMARY KEY. One wins the INSERT;
-  // the other hits the conflict and executes the DO UPDATE path — both get a
+  // the other hits the conflict and executes the DO UPDATE path: both get a
   // valid count. The old split UPDATE/INSERT CTE incorrectly denied the second
   // concurrent first-request (DO NOTHING + no UPDATE match = 0 rows).
   const result = await db.execute(sql`
@@ -145,7 +145,7 @@ export async function reserveQuotaSlot(
  * Atomically refunds (decrements) one quota slot for the current calendar month.
  *
  * Call this when an analysis fails AFTER a slot was reserved but BEFORE a
- * completed result is saved — the user got no value, so they may retry
+ * completed result is saved: the user got no value, so they may retry
  * without penalty. Uses GREATEST(..., 0) to prevent negative counts.
  *
  * Safe to call concurrently: the UPDATE is atomic at the row level.

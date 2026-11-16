@@ -101,7 +101,7 @@ async function main() {
     await runMigration('0002_analysis_status_global_quota.sql');
     console.log('  migration 0002 applied');
 
-    // ── Item 1: Verify migration is additive — all columns present ─────────
+    // ── Item 1: Verify migration is additive: all columns present ─────────
     console.log('\n── Item 1: schema structure after migration 0002 ──');
     const cols = await sql`
       SELECT column_name, data_type, is_nullable, column_default
@@ -133,7 +133,7 @@ async function main() {
     assert('analyses_status_processing_idx created', idxNames.includes('analyses_status_processing_idx'));
 
     // ── Item 3: Verify backfill logic ──────────────────────────────────────
-    console.log('\n── Item 3: backfill — existing analyses get correct status ──');
+    console.log('\n── Item 3: backfill: existing analyses get correct status ──');
 
     // Seed a user
     const userId = crypto.randomUUID();
@@ -190,7 +190,7 @@ async function main() {
       `);
     }
 
-    // Over limit — should return 0 rows
+    // Over limit: should return 0 rows
     const qOver = await sql.query(`
       INSERT INTO "${SCHEMA}"."global_quota_buckets" (bucket_key, count, limit_val)
       VALUES ('${bucket}', 1, 5)
@@ -259,7 +259,7 @@ async function main() {
     assert('stale claim (>2 min) is reclaimable', claimStaleRows.length === 1);
 
     // ── Item 6: Verify migration is idempotent (re-run) ───────────────────
-    console.log('\n── Item 6: idempotency — re-run migration 0002 ──');
+    console.log('\n── Item 6: idempotency: re-run migration 0002 ──');
     try {
       await runMigration('0002_analysis_status_global_quota.sql');
       assert('re-running migration 0002 does not throw', true);
@@ -281,7 +281,7 @@ async function main() {
 
   } finally {
     await sql.query(`DROP SCHEMA IF EXISTS "${SCHEMA}" CASCADE`).catch(() => {});
-    console.log(`Schema "${SCHEMA}" dropped — no production data was touched.\n`);
+    console.log(`Schema "${SCHEMA}" dropped: no production data was touched.\n`);
   }
 
   if (fail > 0) {

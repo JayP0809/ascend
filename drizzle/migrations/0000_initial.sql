@@ -1,7 +1,7 @@
--- Ascend 2.0 — Initial schema migration
+-- Ascend 2.0: Initial schema migration
 -- Generated for PostgreSQL / Neon
 -- Apply with: drizzle-kit migrate (production) or drizzle-kit push (Neon branch dev)
--- Never run this automatically on startup — always an explicit step.
+-- Never run this automatically on startup: always an explicit step.
 
 -- ---------------------------------------------------------------------------
 -- users

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Analysis ID required' }, { status: 400 });
   }
 
-  // Demo IDs are always public — no DB, no auth check.
+  // Demo IDs are always public: no DB, no auth check.
   if (id.startsWith('demo-')) {
     return NextResponse.json({ result: getDemoData(id) });
   }

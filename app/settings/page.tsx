@@ -5,7 +5,7 @@ import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 
 /**
- * Account settings page — requires sign-in.
+ * Account settings page: requires sign-in.
  * Currently provides account information display and account deletion.
  */
 export default function SettingsPage() {
@@ -50,7 +50,7 @@ export default function SettingsPage() {
         throw new Error(body.error ?? `Server error ${res.status}`);
       }
       setDeleteState('done');
-      // Sign out after account deletion — session is now invalid.
+      // Sign out after account deletion: session is now invalid.
       await signOut({ callbackUrl: '/' });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Deletion failed. Please try again.');
@@ -80,7 +80,7 @@ export default function SettingsPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between items-center">
               <span className="text-secondary">Name</span>
-              <span className="text-primary">{session.user.name ?? '—'}</span>
+              <span className="text-primary">{session.user.name ?? 'Not set'}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-secondary">Email</span>
@@ -97,7 +97,7 @@ export default function SettingsPage() {
         <section className="bg-card border border-red-500/20 rounded-xl p-6">
           <h2 className="text-base font-medium text-red-400 mb-1">Danger Zone</h2>
           <p className="text-sm text-secondary mb-5">
-            Permanently delete your account and all associated data — analyses, skill records, and usage history.
+            Permanently delete your account and all associated data: analyses, skill records, and usage history.
             Community trend entries derived from your analyses are anonymized and will remain.
             This action cannot be undone.
           </p>

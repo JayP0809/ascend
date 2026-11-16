@@ -1,13 +1,13 @@
 /**
  * Auth.js v5 (next-auth@beta) configuration.
  *
- * Uses JWT sessions (stateless — no sessions table in Neon).
+ * Uses JWT sessions (stateless: no sessions table in Neon).
  * On first sign-in, the jwt() callback upserts the user into our `users` table
  * and stores their DB UUID in the token so subsequent route-handler calls
  * to getCurrentUser() do not need a DB lookup.
  *
  * The `users.clerk_id` column stores the OAuth provider account ID (Google sub)
- * going forward — the column name is a historical artifact from the Clerk era.
+ * going forward: the column name is a historical artifact from the Clerk era.
  *
  * AUTH_SECRET:    required in production; a placeholder is used in local dev
  *                 so NextAuth initializes without throwing when no credentials
@@ -59,7 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.providerId = account.providerAccountId;
         } catch (err) {
           console.error('[auth] jwt callback: upsertUser failed:', err);
-          // token.userId is left unset — getCurrentUser() returns null,
+          // token.userId is left unset: getCurrentUser() returns null,
           // which is handled as "unauthenticated" by route handlers.
         }
       }

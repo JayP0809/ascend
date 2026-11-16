@@ -3,12 +3,12 @@
  *
  * Uses @neondatabase/serverless with the HTTP transport so this works
  * in Vercel's serverless functions without persistent TCP connections.
- * Each request opens a lightweight HTTPS connection to Neon — no
+ * Each request opens a lightweight HTTPS connection to Neon: no
  * connection pool state survives between invocations, which is exactly
  * what serverless requires.
  *
  * Returns null when DATABASE_URL is not set. All callers must handle
- * null gracefully — demo mode runs entirely without a database.
+ * null gracefully: demo mode runs entirely without a database.
  */
 import { neon } from '@neondatabase/serverless';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';

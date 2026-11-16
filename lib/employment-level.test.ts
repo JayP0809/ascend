@@ -51,7 +51,7 @@ You will lead projects and mentor interns and junior developers on the team.`;
   });
 
   it('does NOT classify as internship when JD has seniority signals even with intern mention', () => {
-    const jd = `Lead Engineer — 7+ years of experience required.
+    const jd = `Lead Engineer, 7+ years of experience required.
 You will supervise interns during their rotations.`;
     const ctx = classifyEmploymentLevel('Lead Engineer', jd);
     expect(ctx.level).toBe('experienced');
@@ -74,14 +74,14 @@ Degree in a quantitative field preferred.`;
   });
 
   it('classifies as coop when JD header says "co-op" and no seniority', () => {
-    const jd = `Co-op Software Developer — Spring 2025\nJoin our engineering team for a 4-month co-operative education placement.`;
+    const jd = `Co-op Software Developer, Spring 2025\nJoin our engineering team for a 4-month co-operative education placement.`;
     const ctx = classifyEmploymentLevel('Software Developer', jd);
     expect(ctx.level).toBe('coop');
     expect(ctx.confidence).toBe('high');
   });
 
   it('classifies internship as high-confidence when student signals present', () => {
-    const jd = `Internship — Data Engineering\nWe are looking for currently enrolled undergraduate students pursuing a B.S. in CS.\nThis is a 12-week summer internship on our data platform team.`;
+    const jd = `Internship, Data Engineering\nWe are looking for currently enrolled undergraduate students pursuing a B.S. in CS.\nThis is a 12-week summer internship on our data platform team.`;
     const ctx = classifyEmploymentLevel('Data Engineer', jd);
     expect(ctx.level).toBe('internship');
     expect(ctx.confidence).toBe('high');

@@ -2,13 +2,13 @@
  * Security and authorization regression tests.
  *
  * Coverage:
- *   1. checkAnalysisAccess() — all branches of the ownership model
- *   2. Demo ID routing — always public, never touches DB
- *   3. Quota enforcement — pure logic (no DB), atomic reservation model
- *   4. Auth module flags — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE semantics
+ *   1. checkAnalysisAccess(): all branches of the ownership model
+ *   2. Demo ID routing: always public, never touches DB
+ *   3. Quota enforcement: pure logic (no DB), atomic reservation model
+ *   4. Auth module flags: AUTH_CONFIGURED and DEV_BYPASS_ACTIVE semantics
  *
  * Tests that require a live database are tagged [integration] and only run
- * when TEST_DATABASE_URL is set — never against the production DATABASE_URL.
+ * when TEST_DATABASE_URL is set: never against the production DATABASE_URL.
  *
  * Tests marked with a comment "// SIMULATED" reason about the authorization
  * logic using the exported helper, NOT about an HTTP round-trip. They do not
@@ -20,7 +20,7 @@ import { checkAnalysisAccess } from './auth';
 import type { AuthUser } from './auth';
 
 // Integration tests require an explicitly isolated database URL.
-// Never use DATABASE_URL (production) — set TEST_DATABASE_URL instead.
+// Never use DATABASE_URL (production): set TEST_DATABASE_URL instead.
 // lib/db-client.ts prefers TEST_DATABASE_URL over DATABASE_URL so no
 // env-var overwriting is needed here. Direct neon() calls in this file
 // also read TEST_DATABASE_URL explicitly.
@@ -41,14 +41,14 @@ function record(userId: string | null) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. checkAnalysisAccess — authorization logic
+// 1. checkAnalysisAccess: authorization logic
 // ---------------------------------------------------------------------------
 
-describe('checkAnalysisAccess — dev bypass (Auth.js absent, non-production)', () => {
+describe('checkAnalysisAccess: dev bypass (Auth.js absent, non-production)', () => {
   // These tests only make sense when Auth.js is not configured.
   // If the CI environment has AUTH_SECRET + AUTH_GOOGLE_ID the results will differ.
   it.skipIf(HAS_AUTH)('allows any user to access any record in dev mode', () => {
-    // SIMULATED — tests the pure function, not an HTTP call
+    // SIMULATED: tests the pure function, not an HTTP call
     const result = checkAnalysisAccess(record('owner-id'), user('other-id'));
     // DEV_BYPASS_ACTIVE = true when CLERK absent + non-production
     expect(result.granted).toBe(true);
@@ -65,7 +65,7 @@ describe('checkAnalysisAccess — dev bypass (Auth.js absent, non-production)', 
   });
 });
 
-describe('checkAnalysisAccess — Auth.js configured (production auth rules)', () => {
+describe('checkAnalysisAccess: Auth.js configured (production auth rules)', () => {
   // These tests simulate the production path by calling the function with
   // arguments that mirror what would happen when AUTH_CONFIGURED = true.
   // Since we cannot flip AUTH_CONFIGURED in a unit test without mocking the
@@ -73,7 +73,7 @@ describe('checkAnalysisAccess — Auth.js configured (production auth rules)', (
   // DEV_BYPASS_ACTIVE condition path where possible.
 
   it('ownership rule: user owning a record is granted access', () => {
-    // SIMULATED — represents the { granted: true } branch when CLERK is live
+    // SIMULATED: represents the { granted: true } branch when CLERK is live
     // and user.userId === record.user_id. We call the helper with real types
     // so the shape is verified even if DEV_BYPASS_ACTIVE changes the result.
     const u = user('alice');
@@ -88,7 +88,7 @@ describe('checkAnalysisAccess — Auth.js configured (production auth rules)', (
   it('cross-user rule: returns 404 to avoid leaking existence', () => {
     // This path is only tested when CLERK is configured.
     if (!HAS_AUTH) {
-      // In dev mode checkAnalysisAccess returns true for all — documented.
+      // In dev mode checkAnalysisAccess returns true for all: documented.
       return;
     }
     const r = record('alice');
@@ -118,7 +118,7 @@ describe('checkAnalysisAccess — Auth.js configured (production auth rules)', (
 });
 
 // ---------------------------------------------------------------------------
-// 2. Authorization model — expected behavior matrix (documented)
+// 2. Authorization model: expected behavior matrix (documented)
 // ---------------------------------------------------------------------------
 //
 // This table is not an executable test; it documents what checkAnalysisAccess
@@ -142,7 +142,7 @@ describe('checkAnalysisAccess — Auth.js configured (production auth rules)', (
 // 3. Demo ID routing
 // ---------------------------------------------------------------------------
 
-describe('demo mode — IDs always public, no DB involved', () => {
+describe('demo mode: IDs always public, no DB involved', () => {
   it('recognizes demo- prefix', () => {
     expect('demo-sample-001'.startsWith('demo-')).toBe(true);
     expect('demo-abc'.startsWith('demo-')).toBe(true);
@@ -171,10 +171,10 @@ describe('demo mode — IDs always public, no DB involved', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Quota enforcement — pure logic (no DB)
+// 4. Quota enforcement: pure logic (no DB)
 // ---------------------------------------------------------------------------
 
-describe('quota — bypass and pure-logic checks', () => {
+describe('quota: bypass and pure-logic checks', () => {
   it('demo flows are always allowed, return 0 usage, do not touch DB', async () => {
     const { reserveQuotaSlot } = await import('./quota');
     const status = await reserveQuotaSlot(null, true);
@@ -201,7 +201,7 @@ describe('quota — bypass and pure-logic checks', () => {
     expect(status.resetAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('resetAt lands on the 1st of a month (UTC) — month boundary reset point', async () => {
+  it('resetAt lands on the 1st of a month (UTC): month boundary reset point', async () => {
     const { getQuotaStatus } = await import('./quota');
     const status = await getQuotaStatus(null);
     expect(status.resetAt.getUTCDate()).toBe(1);
@@ -222,7 +222,7 @@ describe('quota — bypass and pure-logic checks', () => {
 // 4b. Admin quota exemption
 // ---------------------------------------------------------------------------
 
-describe('admin quota exemption — isAdminUser()', () => {
+describe('admin quota exemption: isAdminUser()', () => {
   it('returns false when ADMIN_EMAIL is not set', async () => {
     const { isAdminUser } = await import('./auth');
     // In CI and local dev, ADMIN_EMAIL is not set → no admin
@@ -287,7 +287,7 @@ describe('admin quota exemption — isAdminUser()', () => {
       expect(isAdminUser(adminEmail)).toBe(true);
 
       if (!HAS_AUTH) {
-        // In dev mode, checkAnalysisAccess grants access to all — bypass active.
+        // In dev mode, checkAnalysisAccess grants access to all: bypass active.
         // This test documents that in PRODUCTION (HAS_AUTH=true) the admin
         // cannot access a record they don't own, even with admin status.
         // Manual verification required: see [live-auth] section below.
@@ -354,7 +354,7 @@ describe('admin quota exemption — isAdminUser()', () => {
 // 5. Auth module flags
 // ---------------------------------------------------------------------------
 
-describe('auth — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
+describe('auth: AUTH_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
   it('AUTH_CONFIGURED is false when env vars are absent', async () => {
     const { AUTH_CONFIGURED } = await import('./auth');
     if (!HAS_AUTH) {
@@ -387,10 +387,10 @@ describe('auth — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5b. isSafeCallbackUrl — redirect destination validation
+// 5b. isSafeCallbackUrl: redirect destination validation
 // ---------------------------------------------------------------------------
 
-describe('isSafeCallbackUrl — safe redirect destination', () => {
+describe('isSafeCallbackUrl: safe redirect destination', () => {
   it('accepts the root path', async () => {
     const { isSafeCallbackUrl } = await import('./auth');
     expect(isSafeCallbackUrl('/')).toBe(true);
@@ -417,7 +417,7 @@ describe('isSafeCallbackUrl — safe redirect destination', () => {
 
   it('rejects encoded protocol-relative URLs', async () => {
     const { isSafeCallbackUrl } = await import('./auth');
-    // /%2Fevil.com decodes to //evil.com — must be rejected
+    // /%2Fevil.com decodes to //evil.com: must be rejected
     expect(isSafeCallbackUrl('/%2Fevil.com')).toBe(false);
     // %2F%2Fevil.com does not start with / at all
     expect(isSafeCallbackUrl('%2F%2Fevil.com')).toBe(false);
@@ -464,12 +464,12 @@ describe('isSafeCallbackUrl — safe redirect destination', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5c. Post-sign-in redirect behavior — documented invariants
+// 5c. Post-sign-in redirect behavior: documented invariants
 // ---------------------------------------------------------------------------
 
 describe('post-sign-in redirect invariants (documented)', () => {
   it('the dashboard path without an ID is not a safe callback destination', async () => {
-    // /dashboard without ?id= is useless — the page shows an error.
+    // /dashboard without ?id= is useless: the page shows an error.
     // NavAuthButtons excludes it explicitly; it must not be passed as callbackUrl.
     // We test that isSafeCallbackUrl *accepts* /dashboard (a URL validator cannot
     // know about query param requirements) and document that the navbar
@@ -482,7 +482,7 @@ describe('post-sign-in redirect invariants (documented)', () => {
   });
 
   it('sign-out always redirects to root', () => {
-    // signOut({ callbackUrl: '/' }) — no dynamic path, hardcoded in NavAuthButtons.
+    // signOut({ callbackUrl: '/' }): no dynamic path, hardcoded in NavAuthButtons.
     expect(isSafeCallbackUrlSync('/')).toBe(true);
 
     function isSafeCallbackUrlSync(url: unknown): boolean {
@@ -494,10 +494,10 @@ describe('post-sign-in redirect invariants (documented)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Quota enforcement — concurrent requests (integration, requires DB)
+// 6. Quota enforcement: concurrent requests (integration, requires DB)
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation', () => {
+describe.skipIf(!HAS_DB)('[integration] quota: PostgreSQL atomic reservation', () => {
   // usage_buckets.user_id references users.id (FK). We need real user rows
   // before inserting quota entries. Each test gets its own UUID so they are
   // fully isolated and can run in any order.
@@ -580,7 +580,7 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
     expect(status.used).toBe(1);
   });
 
-  it('[admin] can exceed regular quota limit — usage tracked', async () => {
+  it('[admin] can exceed regular quota limit: usage tracked', async () => {
     const { reserveQuotaSlot, MONTHLY_ANALYSIS_QUOTA } = await import('./quota');
     const adminEmail = `admin_integration_${Date.now()}@ascend.test`;
     const userId = await seedUser(`provider_admin_integration_${Date.now()}`);
@@ -627,10 +627,10 @@ describe.skipIf(!HAS_DB)('[integration] quota — PostgreSQL atomic reservation'
 });
 
 // ---------------------------------------------------------------------------
-// 7. Quota refund — reserve-then-refund leaves count unchanged
+// 7. Quota refund: reserve-then-refund leaves count unchanged
 // ---------------------------------------------------------------------------
 
-describe('quota refund — pure logic (no DB)', () => {
+describe('quota refund: pure logic (no DB)', () => {
   it('refundQuotaSlot is a no-op when userId is null', async () => {
     const { refundQuotaSlot } = await import('./quota');
     // Should not throw; nothing to decrement
@@ -654,7 +654,7 @@ describe('quota refund — pure logic (no DB)', () => {
   });
 });
 
-describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cycle', () => {
+describe.skipIf(!HAS_DB)('[integration] quota refund: reserve-then-refund cycle', () => {
   let seedUser: (providerId: string) => Promise<string>;
 
   beforeAll(async () => {
@@ -706,7 +706,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
     const { refundQuotaSlot, getQuotaStatus } = await import('./quota');
     const userId = await seedUser(`provider_refund_clamp_${Date.now()}`);
 
-    // No reserve — count starts at 0 (no row). Refund on a non-existent row
+    // No reserve: count starts at 0 (no row). Refund on a non-existent row
     // must not error and usage must remain 0.
     await expect(refundQuotaSlot(userId)).resolves.toBeUndefined();
     const after = await getQuotaStatus(userId);
@@ -737,7 +737,7 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
     // Simulate: reserve slot → Groq succeeds → NO refund.
     const r = await reserveQuotaSlot(userId, false);
     expect(r.allowed).toBe(true);
-    // No refundQuotaSlot call — simulating a successful analysis.
+    // No refundQuotaSlot call: simulating a successful analysis.
 
     const status = await getQuotaStatus(userId);
     expect(status.used).toBe(1);
@@ -767,10 +767,10 @@ describe.skipIf(!HAS_DB)('[integration] quota refund — reserve-then-refund cyc
 });
 
 // ---------------------------------------------------------------------------
-// 8. upsertUser — atomic insert prevents duplicate creation
+// 8. upsertUser: atomic insert prevents duplicate creation
 // ---------------------------------------------------------------------------
 
-describe('upsertUser — atomic upsert (no DB, documents expected behavior)', () => {
+describe('upsertUser: atomic upsert (no DB, documents expected behavior)', () => {
   it('upsertUser throws when DATABASE_URL is absent (db unavailable)', async () => {
     if (HAS_DB) return; // DB tests covered in [integration] section below
     const { upsertUser } = await import('./db');
@@ -781,7 +781,7 @@ describe('upsertUser — atomic upsert (no DB, documents expected behavior)', ()
 });
 
 describe.skipIf(!HAS_DB)(
-  '[integration] upsertUser — concurrent first-sign-in race condition',
+  '[integration] upsertUser: concurrent first-sign-in race condition',
   () => {
     it('concurrent upserts for the same provider ID return the same UUID', async () => {
       // Regression test for the SELECT-then-INSERT race: two simultaneous
@@ -815,10 +815,10 @@ describe.skipIf(!HAS_DB)(
 );
 
 // ---------------------------------------------------------------------------
-// 9. POST /api/analyze upload ownership — checkAnalysisAccess called for uploads
+// 9. POST /api/analyze upload ownership: checkAnalysisAccess called for uploads
 // ---------------------------------------------------------------------------
 
-describe('POST /api/analyze — upload ownership enforcement', () => {
+describe('POST /api/analyze: upload ownership enforcement', () => {
   it('checkAnalysisAccess is called with the existing upload record shape', () => {
     // Unit-level: verify the ownership logic handles the analysis record shape.
     // Simulates what POST /api/analyze does before running the AI pipeline.
@@ -829,7 +829,7 @@ describe('POST /api/analyze — upload ownership enforcement', () => {
     const owned = { user_id: 'alice' };
     expect(checkAnalysisAccess(owned, owner).granted).toBe(true);
 
-    // In dev mode (no Auth.js) any record is accessible — dev bypass.
+    // In dev mode (no Auth.js) any record is accessible: dev bypass.
     // We document here that in production (HAS_AUTH=true) cross-user is 404.
     if (HAS_AUTH) {
       const other = { userId: 'bob', providerId: 'g_sub_bob', email: 'bob@test.com' };
@@ -891,10 +891,10 @@ describe('POST /api/analyze — upload ownership enforcement', () => {
  */
 
 // ---------------------------------------------------------------------------
-// 10. Global quota — atomic reservation (pure-logic + integration)
+// 10. Global quota: atomic reservation (pure-logic + integration)
 // ---------------------------------------------------------------------------
 
-describe('global quota — pure-logic (no DB)', () => {
+describe('global quota: pure-logic (no DB)', () => {
   it('reserveGlobalQuotaSlot returns allowed when DATABASE_URL is absent', async () => {
     if (HAS_DB) return;
     const { reserveGlobalQuotaSlot } = await import('./quota');
@@ -916,7 +916,7 @@ describe('global quota — pure-logic (no DB)', () => {
   });
 });
 
-describe.skipIf(!HAS_DB)('[integration] global quota — atomic reservation in global_quota_buckets', () => {
+describe.skipIf(!HAS_DB)('[integration] global quota: atomic reservation in global_quota_buckets', () => {
   // These tests require both DATABASE_URL and migration 0002 (global_quota_buckets table).
   // If the table does not exist the functions degrade gracefully (returns allowed=true)
   // so the tests pass but skip the enforcement assertions.
@@ -961,7 +961,7 @@ describe.skipIf(!HAS_DB)('[integration] global quota — atomic reservation in g
     const sql = neon(u.toString());
 
     const before = await reserveGlobalQuotaSlot(1_000_000);
-    if (!before.allowed) return; // global cap already reached — skip
+    if (!before.allowed) return; // global cap already reached: skip
     const countBefore = before.used ?? 0;
 
     await refundGlobalQuotaSlot();
@@ -978,10 +978,10 @@ describe.skipIf(!HAS_DB)('[integration] global quota — atomic reservation in g
 });
 
 // ---------------------------------------------------------------------------
-// 11. DB-backed idempotency — claimAnalysisSlot (pure-logic + integration)
+// 11. DB-backed idempotency: claimAnalysisSlot (pure-logic + integration)
 // ---------------------------------------------------------------------------
 
-describe('claimAnalysisSlot — pure-logic (no DB)', () => {
+describe('claimAnalysisSlot: pure-logic (no DB)', () => {
   it('returns claimed when DATABASE_URL is absent (local dev)', async () => {
     if (HAS_DB) return;
     const { claimAnalysisSlot } = await import('./db');
@@ -998,7 +998,7 @@ describe('claimAnalysisSlot — pure-logic (no DB)', () => {
   });
 });
 
-describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempotency', () => {
+describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot: DB-backed idempotency', () => {
   // Requires migration 0002 (status column on analyses). If not migrated,
   // claimAnalysisSlot returns 'unavailable' and the assertions still document
   // the expected post-migration behavior.
@@ -1084,7 +1084,7 @@ describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempote
     expect(result).toBe('claimed');
   });
 
-  it('complete analysis claim returns complete — allows cached-result short-circuit', async () => {
+  it('complete analysis claim returns complete: allows cached-result short-circuit', async () => {
     const { claimAnalysisSlot } = await import('./db');
     const { neon } = await import('@neondatabase/serverless');
     const rawUrl = TEST_DB_URL!;
@@ -1125,10 +1125,10 @@ describe.skipIf(!HAS_DB)('[integration] claimAnalysisSlot — DB-backed idempote
 });
 
 // ---------------------------------------------------------------------------
-// 12. Account deletion — DELETE /api/user authorization
+// 12. Account deletion: DELETE /api/user authorization
 // ---------------------------------------------------------------------------
 
-describe('account deletion — authorization (documented, requires live auth)', () => {
+describe('account deletion: authorization (documented, requires live auth)', () => {
   it('deleteUser and deleteUserAnalyses are exported from db module', async () => {
     // Verifies the account deletion functions exist and have the expected signature.
     const { deleteUser, deleteUserAnalyses } = await import('./db');
@@ -1155,7 +1155,7 @@ describe('account deletion — authorization (documented, requires live auth)', 
   });
 });
 
-describe.skipIf(!HAS_DB)('[integration] account deletion — cascading data removal', () => {
+describe.skipIf(!HAS_DB)('[integration] account deletion: cascading data removal', () => {
   it('deleting a user removes associated analyses and usage records', async () => {
     const { upsertUser, saveAnalysis, deleteUser, getUserAnalyses } = await import('./db');
     const { reserveQuotaSlot } = await import('./quota');
@@ -1187,7 +1187,7 @@ describe.skipIf(!HAS_DB)('[integration] account deletion — cascading data remo
 // 13. Ownership enforced before cached-result short-circuit (Item 7)
 // ---------------------------------------------------------------------------
 
-describe('POST /api/analyze — ownership checked before returning cached result', () => {
+describe('POST /api/analyze: ownership checked before returning cached result', () => {
   it('checkAnalysisAccess is called with the record before the short-circuit path', () => {
     // This test verifies the design invariant: the ownership check runs BEFORE
     // the cached-result short-circuit in POST /api/analyze.
@@ -1196,7 +1196,7 @@ describe('POST /api/analyze — ownership checked before returning cached result
     // If auth is configured, a cross-user request must be denied even when
     // the record has a completed result_json.
     if (!HAS_AUTH) {
-      // In dev mode checkAnalysisAccess grants all — document the invariant.
+      // In dev mode checkAnalysisAccess grants all: document the invariant.
       const owner = { userId: 'alice', providerId: 'g_alice', email: 'alice@test.com' };
       const completedRecord = { user_id: 'alice', result_json: '{"skillExtraction":{}}' };
       const result = checkAnalysisAccess(completedRecord, owner);

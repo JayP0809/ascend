@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCommunityEntries, getTrendingSkills, getPopularRoles } from '@/lib/db';
 
-// Fixed base time — stable anchor prevents SSR/client hydration mismatches.
+// Fixed base time: stable anchor prevents SSR/client hydration mismatches.
 // Illustrative sample entries, not real user data.
 const DEMO_BASE_MS = new Date('2025-11-13T12:00:00.000Z').getTime();
 
@@ -48,7 +48,7 @@ export async function GET(): Promise<NextResponse> {
       getPopularRoles(),
     ]);
 
-    // Normalize DB rows — created_at may be a Date object from Drizzle
+    // Normalize DB rows: created_at may be a Date object from Drizzle
     const entries = rawEntries.map((e) => ({
       ...e,
       created_at: e.created_at instanceof Date ? e.created_at.toISOString() : e.created_at,

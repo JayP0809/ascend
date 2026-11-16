@@ -15,7 +15,7 @@ import { relations } from 'drizzle-orm';
 // ---------------------------------------------------------------------------
 // users
 // Populated by Clerk webhook on first sign-in. clerk_id is the Clerk user ID.
-// Not required yet — user_id columns are nullable until auth is live.
+// Not required yet: user_id columns are nullable until auth is live.
 // ---------------------------------------------------------------------------
 export const users = pgTable('users', {
   id:        uuid('id').primaryKey().defaultRandom(),
@@ -32,7 +32,7 @@ export const users = pgTable('users', {
 // analyses
 // One row per career-analysis run. user_id is nullable so the table works
 // before auth is introduced (upload → analyze flow uses a UUID we generate).
-// resume_text stores the truncated extracted text — raw file is never kept.
+// resume_text stores the truncated extracted text: raw file is never kept.
 // ---------------------------------------------------------------------------
 export const analyses = pgTable('analyses', {
   id:                   uuid('id').primaryKey(),
@@ -59,7 +59,7 @@ export const analyses = pgTable('analyses', {
 
 // ---------------------------------------------------------------------------
 // skill_records
-// Flattened skill rows for each analysis — enables fast filtering/aggregation
+// Flattened skill rows for each analysis: enables fast filtering/aggregation
 // without JSON parsing.
 // ---------------------------------------------------------------------------
 export const skillRecords = pgTable('skill_records', {
@@ -94,7 +94,7 @@ export const roadmapPhases = pgTable('roadmap_phases', {
 // ---------------------------------------------------------------------------
 // community
 // Anonymized aggregate entries that power the community section.
-// analysis_id is nullable — demo/synthetic entries have no linked analysis.
+// analysis_id is nullable: demo/synthetic entries have no linked analysis.
 // ---------------------------------------------------------------------------
 export const community = pgTable('community', {
   id:             uuid('id').primaryKey().defaultRandom(),
@@ -137,7 +137,7 @@ export const aiUsage = pgTable('ai_usage', {
 // usage_buckets
 // Atomic quota reservation. One row per (user_id, bucket_key) where
 // bucket_key is the month string "YYYY-MM". A single atomic SQL statement
-// increments the count or refuses if count >= limit — prevents concurrent
+// increments the count or refuses if count >= limit: prevents concurrent
 // requests from bypassing the quota.
 // ---------------------------------------------------------------------------
 export const usageBuckets = pgTable('usage_buckets', {
@@ -153,7 +153,7 @@ export const usageBuckets = pgTable('usage_buckets', {
 // ---------------------------------------------------------------------------
 // global_quota_buckets
 // One row per calendar month ('YYYY-MM'). Tracks the total number of Groq
-// requests attempted across ALL users — intentionally counts attempts, not
+// requests attempted across ALL users: intentionally counts attempts, not
 // completions, so failed requests that consumed provider tokens are charged.
 // Atomic INSERT ... ON CONFLICT DO UPDATE prevents concurrent requests from
 // both passing the cap check before either increments the counter.

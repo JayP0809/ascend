@@ -1,4 +1,4 @@
-# Ascend 2.0 — Cloud Setup Guide
+# Ascend 2.0: Cloud Setup Guide
 
 **Purpose:** Connect Neon (PostgreSQL), Clerk (auth), and Vercel (hosting).
 All three plans are permanently free with no auto-billing.
@@ -6,17 +6,17 @@ No services have been provisioned yet. Complete these steps in order.
 
 ---
 
-## Step 1 — Neon Free PostgreSQL
+## Step 1: Neon Free PostgreSQL
 
 **Plan:** Neon Free (no credit card required)
 **Free limits:** 0.5 GB storage, 100 compute-unit-hours/month, 1 project, auto-sleep after 5 min idle
-**Overage behavior:** Compute pauses (requests fail gracefully); storage writes blocked — no charges
+**Overage behavior:** Compute pauses (requests fail gracefully); storage writes blocked: no charges
 
 ### Setup
 
 1. Go to **neon.tech** → Sign Up (GitHub login works)
 2. Create project: name `ascend`, region `US East (Ohio)` or closest to your users
-3. Select the **Free** plan — verify no payment method is requested
+3. Select the **Free** plan: verify no payment method is requested
 4. Navigate to **Connection Details** → copy the connection string:
    ```
    postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
@@ -38,15 +38,15 @@ Check Neon's **Tables** tab to confirm all 7 tables exist.
 ### Verify free tier
 
 In Neon dashboard → **Billing**: confirm plan shows "Free" with no payment method.
-Check "Usage" tab — compute-unit hours and storage are shown with free-tier limits.
+Check "Usage" tab: compute-unit hours and storage are shown with free-tier limits.
 
 ---
 
-## Step 2 — Clerk Hobby (authentication)
+## Step 2: Clerk Hobby (authentication)
 
 **Plan:** Clerk Hobby (no credit card required)
 **Free limits:** 10,000 monthly active users, all OAuth providers, unlimited sign-ins
-**Overage behavior:** Requests beyond MAU limit are blocked — no charges
+**Overage behavior:** Requests beyond MAU limit are blocked: no charges
 
 ### Setup
 
@@ -54,20 +54,20 @@ Check "Usage" tab — compute-unit hours and storage are shown with free-tier li
 2. Create application: name `Ascend`, enable **Google** as sign-in provider
 3. Skip all paid add-ons
 4. Navigate to **API Keys** tab → copy both keys:
-   - `CLERK_SECRET_KEY` — starts with `sk_live_...`
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — starts with `pk_live_...`
+   - `CLERK_SECRET_KEY`: starts with `sk_live_...`
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: starts with `pk_live_...`
 5. Add to `.env.local`:
    ```
    CLERK_SECRET_KEY=sk_live_...
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
    ```
-6. Restart `npm run dev` — the middleware switches automatically from pass-through to Clerk
+6. Restart `npm run dev`: the middleware switches automatically from pass-through to Clerk
 
 ### Verify Clerk activation
 
 After restarting dev server:
-- GET `/` — still accessible (public route)
-- GET `/api/analyze?id=demo-sample-001` — still accessible (demo)
+- GET `/`: still accessible (public route)
+- GET `/api/analyze?id=demo-sample-001`: still accessible (demo)
 - POST `/api/analyze` with a real analysisId without signing in → should return 401
 
 ### Verify free tier
@@ -76,11 +76,11 @@ In Clerk dashboard → **Billing** → confirm plan shows "Hobby" with no paymen
 
 ---
 
-## Step 3 — Vercel Hobby (hosting)
+## Step 3: Vercel Hobby (hosting)
 
 **Plan:** Vercel Hobby (no credit card required)
 **Free limits:** Unlimited deployments, 100 GB bandwidth/month, 6,000 serverless function-hours/month
-**Overage behavior:** Deployments blocked if limits hit — no charges
+**Overage behavior:** Deployments blocked if limits hit: no charges
 **Restriction:** Hobby plan is for non-commercial use only. Upgrade to Pro if monetized.
 
 ### Setup
@@ -102,8 +102,8 @@ In Clerk dashboard → **Billing** → confirm plan shows "Hobby" with no paymen
 ### Post-deploy verification
 
 After first deployment:
-- Visit your `.vercel.app` URL — landing page loads (static)
-- Visit `/dashboard` with `?id=demo-sample-001` — demo mode works
+- Visit your `.vercel.app` URL: landing page loads (static)
+- Visit `/dashboard` with `?id=demo-sample-001`: demo mode works
 - Try GET `/api/analyze?id=<a-real-uuid>` without signing in → 401 (Clerk active)
 - Try GET `/api/analyze?id=demo-sample-001` → 200 with `isDemoMode: true`
 
@@ -113,7 +113,7 @@ In Vercel dashboard → **Settings → Billing** → confirm plan shows "Hobby" 
 
 ---
 
-## Step 4 — Run database migrations on Neon
+## Step 4: Run database migrations on Neon
 
 After connecting Neon and setting `DATABASE_URL` locally:
 
@@ -127,11 +127,11 @@ If you need to verify the schema matches the Drizzle definition:
 npm run db:studio
 ```
 
-This opens Drizzle Studio in your browser — a read-only view of the live schema.
+This opens Drizzle Studio in your browser: a read-only view of the live schema.
 
 ---
 
-## Step 5 — Configure your administrator account (optional)
+## Step 5: Configure your administrator account (optional)
 
 Your account has no monthly analysis limit. To activate this:
 
@@ -139,12 +139,12 @@ Your account has no monthly analysis limit. To activate this:
 
 After completing Step 2 (Clerk setup) and signing in to your local dev app:
 
-**Option A — Clerk dashboard (most reliable):**
+**Option A: Clerk dashboard (most reliable):**
 1. Go to [clerk.com](https://clerk.com) → Your application → **Users**
 2. Click your account row
-3. Copy the **User ID** field — it starts with `user_` (e.g. `user_2NkXYZ...`)
+3. Copy the **User ID** field: it starts with `user_` (e.g. `user_2NkXYZ...`)
 
-**Option B — Clerk dashboard quick path:**
+**Option B: Clerk dashboard quick path:**
 1. After signing in locally, go to your Clerk dashboard → **Users** tab
 2. Your user appears immediately after first sign-in
 
@@ -156,19 +156,19 @@ ADMIN_CLERK_USER_ID=user_2NkXYZ...
 ```
 
 For Vercel: add `ADMIN_CLERK_USER_ID` in **Settings → Environment Variables**.
-Set scope to **Production** only (or Production + Preview — not Development unless you want it active there too).
+Set scope to **Production** only (or Production + Preview: not Development unless you want it active there too).
 
 ### Verify it works
 
 After setting the variable and restarting `npm run dev`:
 - Run more than 5 analyses while signed in as your account
 - Each should succeed; check server logs for `[quota] admin exemption used`
-- Run as a different test account — that account must still hit the limit at 5
+- Run as a different test account: that account must still hit the limit at 5
 
 **Security notes:**
-- `ADMIN_CLERK_USER_ID` is a server-only env var — it is never sent to the browser
+- `ADMIN_CLERK_USER_ID` is a server-only env var: it is never sent to the browser
 - The check compares against the Clerk JWT claim (`clerkId` from a verified session), never client-supplied data
-- Admin status bypasses the monthly quota only — it does NOT grant access to other users' analyses
+- Admin status bypasses the monthly quota only: it does NOT grant access to other users' analyses
 
 ---
 
@@ -183,7 +183,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=    # Clerk publishable key
 
 # Optional
 ANALYSIS_QUOTA_PER_MONTH=5            # Monthly analysis limit per user (default: 5)
-ADMIN_CLERK_USER_ID=                  # Your Clerk user ID — bypasses monthly quota
+ADMIN_CLERK_USER_ID=                  # Your Clerk user ID: bypasses monthly quota
 NEXT_PUBLIC_POSTHOG_KEY=              # PostHog project API key (analytics)
 NEXT_PUBLIC_POSTHOG_HOST=             # PostHog host (https://us.i.posthog.com)
 UPSTASH_REDIS_REST_URL=               # Upstash Redis URL (rate limiting)

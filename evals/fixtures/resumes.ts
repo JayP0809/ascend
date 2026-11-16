@@ -7,7 +7,7 @@ export interface ResumeFixture {
   description: string;
   text: string;
   expectedSkills: string[];       // skills that should definitely be extracted
-  unexpectedSkills: string[];     // skills NOT in resume — should not appear
+  unexpectedSkills: string[];     // skills NOT in resume, should not appear
   expectedExperienceRange: [number, number]; // [min, max] years
 }
 
@@ -20,7 +20,7 @@ Alex Rivera
 Software Engineer | alex.rivera@example.com
 
 EXPERIENCE
-Junior Software Engineer — TechCorp Inc. (2022–2024)
+Junior Software Engineer, TechCorp Inc. (2022–2024)
 - Built REST APIs using Python and FastAPI
 - Developed frontend features using React and TypeScript
 - Wrote unit tests using pytest
@@ -28,7 +28,7 @@ Junior Software Engineer — TechCorp Inc. (2022–2024)
 - Worked in Agile sprints with daily standups
 
 EDUCATION
-B.S. Computer Science — State University (2022)
+B.S. Computer Science, State University (2022)
 
 SKILLS
 Languages: Python, JavaScript, TypeScript, SQL
@@ -48,19 +48,19 @@ Jordan Chen
 Data Analyst | jordan.chen@example.com
 
 EXPERIENCE
-Senior Data Analyst — RetailCo (2020–2024)
+Senior Data Analyst, RetailCo (2020–2024)
 - Wrote complex SQL queries against PostgreSQL and BigQuery (100M+ row tables)
 - Built dashboards in Tableau and Looker for executive reporting
 - Automated ETL pipelines using Python (pandas, numpy)
 - Conducted A/B test analysis using statistical hypothesis testing
 - Collaborated with product teams to define KPIs and success metrics
 
-Data Analyst Intern — StartupXYZ (2019–2020)
+Data Analyst Intern, StartupXYZ (2019–2020)
 - Analyzed customer behavior data using Excel and Python
 - Created weekly performance reports
 
 EDUCATION
-B.S. Statistics — City University (2019)
+B.S. Statistics, City University (2019)
 
 SKILLS
 Languages: SQL, Python
@@ -81,11 +81,11 @@ Taylor Kim
 Computer Science Student | taylor.kim@example.edu
 
 EDUCATION
-B.S. Computer Science — State University (Expected 2026, GPA 3.7)
+B.S. Computer Science, State University (Expected 2026, GPA 3.7)
 Relevant coursework: Data Structures, Algorithms, Operating Systems, Databases, Web Development
 
 EXPERIENCE
-Software Engineering Intern — SmallStartup (Summer 2024)
+Software Engineering Intern, SmallStartup (Summer 2024)
 - Built a REST API endpoint using Python and Flask
 - Fixed 5 bugs in the existing Java codebase
 - Wrote unit tests with pytest
@@ -112,21 +112,21 @@ Sam Patel
 Machine Learning Engineer | sam.patel@example.com
 
 EXPERIENCE
-ML Engineer — AIStartup (2021–2024)
+ML Engineer, AIStartup (2021–2024)
 - Trained and deployed NLP models using PyTorch and HuggingFace Transformers
 - Built ML pipelines using Apache Airflow and MLflow for experiment tracking
 - Deployed models to AWS SageMaker and Lambda
 - Wrote Python services wrapping model inference endpoints (FastAPI)
 - Maintained feature store using Redis and S3
 
-Data Scientist — DataCo (2019–2021)
+Data Scientist, DataCo (2019–2021)
 - Built predictive models using scikit-learn (regression, classification, XGBoost)
 - Performed feature engineering on structured datasets
 - Presented findings to non-technical stakeholders
 
 EDUCATION
-M.S. Computer Science (ML concentration) — Tech University (2019)
-B.S. Mathematics — Tech University (2017)
+M.S. Computer Science (ML concentration), Tech University (2019)
+B.S. Mathematics, Tech University (2017)
 
 SKILLS
 ML: PyTorch, scikit-learn, HuggingFace, XGBoost, MLflow

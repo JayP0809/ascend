@@ -1,4 +1,4 @@
-# Ascend 2.0 — Zero-Cost Production Architecture
+# Ascend 2.0: Zero-Cost Production Architecture
 
 **Status:** Proposal. No services provisioned. No migrations performed. All decisions below require explicit approval before implementation.
 
@@ -35,13 +35,13 @@
 
 ### Detailed notes
 
-**Vercel Hobby — commercial use restriction**
+**Vercel Hobby: commercial use restriction**
 Vercel Hobby is restricted to personal, non-commercial projects. Charging users, running ads, or being paid to build/host the site require the Pro plan ($20/month). A free-to-use student portfolio app with no monetization qualifies as non-commercial. This is acceptable for Ascend now. If Ascend ever adds paid features, migrate to Vercel Pro. Document this restriction so it is never overlooked.
 
-**Neon — 5-minute auto-sleep**
+**Neon: 5-minute auto-sleep**
 Free-tier compute auto-sleeps after 5 minutes of inactivity. Cold-start adds ~500ms on the first request after idle. For a portfolio demo this is acceptable. The database never loses data on sleep; it only pauses compute.
 
-**Groq — TPM is the real bottleneck**
+**Groq: TPM is the real bottleneck**
 Ascend makes 4 Groq API calls per analysis (skill extraction, role requirements, gap analysis, roadmap). Each call likely consumes 500–1,500 tokens. At ~6,000 TPM free, that means only 1–4 concurrent analyses per minute before rate-limiting. Under sustained load, users will receive 429 errors. The app must handle these gracefully (see §4). For a portfolio demo with low traffic, this is adequate.
 
 **Sentry and Upstash card requirement**
@@ -106,25 +106,25 @@ CI/CD
 
 ## 3. Per-Component Design
 
-### 3.1 Hosting — Vercel Hobby
+### 3.1 Hosting: Vercel Hobby
 
 - Next.js 15 App Router with React Server Components
-- Serverless function timeout: Vercel Hobby supports up to ~300s execution (verify on current Vercel docs — third-party sources only). Groq analysis currently takes 10–30s over 4 sequential calls. This should be safe.
+- Serverless function timeout: Vercel Hobby supports up to ~300s execution (verify on current Vercel docs: third-party sources only). Groq analysis currently takes 10–30s over 4 sequential calls. This should be safe.
 - If Vercel enforces a stricter timeout: parallelize the two independent calls (`extractSkills` + `getRoleRequirements` already run concurrently in the current code), which halves wall-clock time.
 - Environment variables: `GROQ_API_KEY`, `DATABASE_URL`, `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `NEXT_PUBLIC_POSTHOG_KEY`, `SENTRY_DSN`
-- Preview deployments per PR — useful for solo developer
+- Preview deployments per PR: useful for solo developer
 
-### 3.2 Database — Neon PostgreSQL + Drizzle ORM
+### 3.2 Database: Neon PostgreSQL + Drizzle ORM
 
 **Why Neon over Supabase, PlanetScale, or Railway:**
 - Genuinely free, no card, 1 GB storage with hard stop (not auto-charge)
-- Native serverless HTTP driver (`@neondatabase/serverless`) — no persistent connection pool, works correctly in Vercel serverless functions
-- Database branching — create an isolated branch per PR for safe migration testing
+- Native serverless HTTP driver (`@neondatabase/serverless`): no persistent connection pool, works correctly in Vercel serverless functions
+- Database branching: create an isolated branch per PR for safe migration testing
 - 100 CU-hours/month is generous for sporadic portfolio traffic
 
 **Why Drizzle over Prisma:**
 - Schema defined in TypeScript, migrations are plain SQL files (readable, debuggable, reviewable)
-- No binary Prisma engine to compile — faster cold starts, smaller function bundles
+- No binary Prisma engine to compile: faster cold starts, smaller function bundles
 - Type-safe query builder without code generation step
 - Easier to explain in a SQL-focused data engineering interview
 
@@ -148,17 +148,17 @@ Note: `raw_json` stores the full structured AI response. All PII: only `email` a
 2. `drizzle-kit generate` → produces SQL migration files in `drizzle/migrations/`
 3. Test migration on a Neon branch (`drizzle-kit push --config=drizzle.config.ts`)
 4. Apply to main Neon database only after full review
-5. Never auto-migrate on startup — always a deliberate `drizzle-kit migrate` step
+5. Never auto-migrate on startup: always a deliberate `drizzle-kit migrate` step
 
-### 3.3 Authentication — Clerk Hobby
+### 3.3 Authentication: Clerk Hobby
 
 **Why Clerk over Auth.js / NextAuth v5:**
-- Pre-built UI for sign-in, sign-up, user profile — zero custom auth UI to maintain
+- Pre-built UI for sign-in, sign-up, user profile: zero custom auth UI to maintain
 - Google Sign-In with one config entry
 - Native Next.js App Router middleware (`clerkMiddleware()`)
-- 50,000 MRU free — functionally unlimited for a portfolio app
+- 50,000 MRU free: functionally unlimited for a portfolio app
 - User management dashboard built in
-- Security critical: custom auth means custom JWT handling, custom session management, custom CSRF protection — not appropriate for a solo portfolio project
+- Security critical: custom auth means custom JWT handling, custom session management, custom CSRF protection: not appropriate for a solo portfolio project
 
 **Flow:**
 - Landing page and demo mode: public, no auth required
@@ -166,7 +166,7 @@ Note: `raw_json` stores the full structured AI response. All PII: only `email` a
 - Real analysis (upload + analyze): requires Clerk session
 - All `/api/analyze`, `/api/upload`, `/api/results/*` endpoints check `auth()` from Clerk middleware and reject unauthenticated requests
 
-**User data isolation:** Every `analyses` record stores `user_id` (Clerk ID). API routes query `WHERE user_id = auth().userId` — a valid session cannot access another user's data.
+**User data isolation:** Every `analyses` record stores `user_id` (Clerk ID). API routes query `WHERE user_id = auth().userId`: a valid session cannot access another user's data.
 
 ### 3.4 File and Resume Storage
 
@@ -177,12 +177,12 @@ Privacy benefit: if a user deletes their account, there is no file to track down
 
 If resume versioning is added later: Vercel Blob (500 MB free, integrated with Vercel Hobby) is the natural next step. Not needed for initial launch.
 
-### 3.5 AI Integration — Groq Free API
+### 3.5 AI Integration: Groq Free API
 
 **Rate limit handling (required for production):**
-- On HTTP 429 from Groq: return a clear user-facing error ("AI analysis is temporarily at capacity — try again in a moment, or use the demo to explore the app")
+- On HTTP 429 from Groq: return a clear user-facing error ("AI analysis is temporarily at capacity: try again in a moment, or use the demo to explore the app")
 - Implement exponential backoff on the existing `callAndValidate()` retry loop (currently fixed retry, should respect `Retry-After` header)
-- Do not retry indefinitely on 429 — fail fast and show the graceful fallback
+- Do not retry indefinitely on 429: fail fast and show the graceful fallback
 
 **Per-user quota:**
 - Proposed: 10 live analyses per user per 30-day window
@@ -191,7 +191,7 @@ If resume versioning is added later: Vercel Blob (500 MB free, integrated with V
 - Quota check runs before Groq is called (server-side only, no client-side trust)
 - 10 analyses × 4 calls × ~1,500 tokens avg = ~60,000 tokens/user/month → Groq's free TPM limit is a per-minute rate, not a monthly cap; at 60K tokens/month per user, 10 users = 600K tokens/month, entirely within normal usage
 
-### 3.6 Rate Limiting — Upstash Redis
+### 3.6 Rate Limiting: Upstash Redis
 
 **Primary: Upstash Redis + `@upstash/ratelimit`**
 
@@ -202,20 +202,20 @@ Configuration:
 // 20 requests/minute per IP for unauthenticated routes
 ```
 
-500K commands/month free. Each rate-limit check costs ~2 Redis commands. 250K checks/month → supports ~830 daily active users at 10 checks/day — far exceeds portfolio needs.
+500K commands/month free. Each rate-limit check costs ~2 Redis commands. 250K checks/month → supports ~830 daily active users at 10 checks/day: far exceeds portfolio needs.
 
 **Fallback if Upstash requires a card:** Neon PostgreSQL rate-limit table using upsert-and-read pattern (adds ~20ms per check). Adequate for portfolio scale.
 
-**Do not use in-memory rate limiting in production.** Vercel serverless functions are stateless — in-memory state does not persist between invocations and provides no real protection.
+**Do not use in-memory rate limiting in production.** Vercel serverless functions are stateless: in-memory state does not persist between invocations and provides no real protection.
 
-### 3.7 Product Analytics — PostHog Free
+### 3.7 Product Analytics: PostHog Free
 
 1M events/month, 1-year retention, no card required.
 
 **Events to track:**
-- `analysis_started` — target_role, demo vs. live
-- `analysis_completed` — readiness_score (bucket, not exact), time_ms, model
-- `analysis_failed` — error_type (quota_exceeded, groq_error, timeout)
+- `analysis_started`: target_role, demo vs. live
+- `analysis_completed`: readiness_score (bucket, not exact), time_ms, model
+- `analysis_failed`: error_type (quota_exceeded, groq_error, timeout)
 - `export_pdf_clicked`
 - `roadmap_milestone_checked`
 - `demo_mode_viewed`
@@ -228,27 +228,27 @@ Configuration:
 - PostHog IP masking enabled
 - Target role and skill names are acceptable (not PII)
 
-### 3.8 Error Monitoring — Sentry Developer (or Vercel logs fallback)
+### 3.8 Error Monitoring: Sentry Developer (or Vercel logs fallback)
 
-**Primary:** Sentry Developer — 5K errors/month, 1 user, free.
+**Primary:** Sentry Developer: 5K errors/month, 1 user, free.
 **Fallback if card required:** Vercel's built-in function logs capture all server errors. Combined with PostHog's `analysis_failed` events, this gives adequate error visibility for a portfolio app without Sentry.
 
 **Decision:** Attempt Sentry signup card-free. If a card is required, use Vercel logs + PostHog error events.
 
-### 3.9 CI/CD — GitHub Actions
+### 3.9 CI/CD: GitHub Actions
 
 Existing `.github/workflows/ci.yml` already covers typecheck → lint → test → build.
 
 **Additions for production:**
-1. Add `eval` step (deterministic only — no live API in CI)
+1. Add `eval` step (deterministic only: no live API in CI)
 2. Add deploy step: `vercel --prod` via `VERCEL_TOKEN` secret (auto-deploys on merge to `main`)
-3. Keep the repo public — unlimited free Actions minutes
+3. Keep the repo public: unlimited free Actions minutes
 
 ### 3.10 Backup and Recovery
 
 Neon Free includes point-in-time restore (PITR) up to 7 days on the free tier. This is adequate for a portfolio app. No manual backup scripts needed.
 
-For the database schema and migration files: these are version-controlled in `drizzle/migrations/` — full schema reconstruction is always possible from the migration history.
+For the database schema and migration files: these are version-controlled in `drizzle/migrations/`: full schema reconstruction is always possible from the migration history.
 
 ---
 
@@ -256,7 +256,7 @@ For the database schema and migration files: these are version-controlled in `dr
 
 | Service limit hit | Behavior |
 |---|---|
-| Groq 429 (rate limit) | Clear error message: "AI is temporarily at capacity — try demo mode or retry in a moment." Demo mode remains fully functional. |
+| Groq 429 (rate limit) | Clear error message: "AI is temporarily at capacity: try demo mode or retry in a moment." Demo mode remains fully functional. |
 | Groq quota per user exhausted (10/month) | Message with reset date: "You've used your 10 free analyses this month. Your quota resets on [date]." |
 | Neon storage limit (1 GB) | New writes fail with a clear server error. Existing data remains readable. Admin alert via PostHog event. |
 | Neon compute hours exhausted | Database becomes temporarily unavailable. Demo mode (no DB needed) continues to work. |
@@ -273,7 +273,7 @@ For the database schema and migration files: these are version-controlled in `dr
 
 ## 5. Implementation Roadmap
 
-### Milestone 4A — Database Migration (requires approval)
+### Milestone 4A: Database Migration (requires approval)
 
 **Deliverables:** Replace `better-sqlite3` with Neon PostgreSQL + Drizzle ORM. All existing functionality continues to work.
 
@@ -283,11 +283,11 @@ For the database schema and migration files: these are version-controlled in `dr
 - Env var: `DATABASE_URL` (Neon connection string)
 
 **Codebase changes:**
-- `drizzle/schema.ts` — TypeScript schema definition
-- `drizzle/migrations/` — SQL migration files
-- `lib/db.ts` — replace `better-sqlite3` instance with Drizzle+Neon adapter
-- All API routes that use `db` — update query syntax (Drizzle vs. better-sqlite3 `prepare`)
-- `next.config.js` — remove `serverExternalPackages: ['better-sqlite3']`
+- `drizzle/schema.ts`: TypeScript schema definition
+- `drizzle/migrations/`: SQL migration files
+- `lib/db.ts`: replace `better-sqlite3` instance with Drizzle+Neon adapter
+- All API routes that use `db`: update query syntax (Drizzle vs. better-sqlite3 `prepare`)
+- `next.config.js`: remove `serverExternalPackages: ['better-sqlite3']`
 
 **Security:** `DATABASE_URL` in environment variables only, never committed.
 
@@ -305,7 +305,7 @@ For the database schema and migration files: these are version-controlled in `dr
 
 ---
 
-### Milestone 4B — Authentication (requires approval)
+### Milestone 4B: Authentication (requires approval)
 
 **Deliverables:** Clerk authentication with Google Sign-In. Real analyses require login. Demo mode remains public.
 
@@ -314,15 +314,15 @@ For the database schema and migration files: these are version-controlled in `dr
 - Env vars: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 
 **Codebase changes:**
-- `app/layout.tsx` — wrap in `<ClerkProvider>`
-- `middleware.ts` — add `clerkMiddleware()`, protect `/dashboard` for real (non-demo) sessions
-- `app/api/analyze/route.ts` — add `auth()` check, attach `userId` to saved analysis
-- `app/api/upload/route.ts` — add `auth()` check
-- All `lib/db.ts` queries — filter by `user_id` from Clerk session
+- `app/layout.tsx`: wrap in `<ClerkProvider>`
+- `middleware.ts`: add `clerkMiddleware()`, protect `/dashboard` for real (non-demo) sessions
+- `app/api/analyze/route.ts`: add `auth()` check, attach `userId` to saved analysis
+- `app/api/upload/route.ts`: add `auth()` check
+- All `lib/db.ts` queries: filter by `user_id` from Clerk session
 - UI: add sign-in/sign-up buttons to landing page and dashboard header
 
 **Security:**
-- Server-side `auth()` check on every protected route — not client-side only
+- Server-side `auth()` check on every protected route: not client-side only
 - `user_id` column added to `analyses` table (Milestone 4A prerequisite)
 - Never expose another user's analysis ID in a URL that bypasses auth check
 
@@ -339,7 +339,7 @@ For the database schema and migration files: these are version-controlled in `dr
 
 ---
 
-### Milestone 4C — Rate Limiting and Quotas (requires approval)
+### Milestone 4C: Rate Limiting and Quotas (requires approval)
 
 **Deliverables:** Per-user AI quota (10/month), per-route rate limits via Upstash Redis.
 
@@ -348,10 +348,10 @@ For the database schema and migration files: these are version-controlled in `dr
 - Env vars: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 
 **Codebase changes:**
-- `lib/ratelimit.ts` — Upstash sliding-window rate limiter instances
-- `middleware.ts` — apply IP-based rate limit to unauthenticated routes
-- `app/api/analyze/route.ts` — per-user quota check before Groq is called; quota stored in `ai_usage` table
-- `app/api/upload/route.ts` — per-user upload rate limit
+- `lib/ratelimit.ts`: Upstash sliding-window rate limiter instances
+- `middleware.ts`: apply IP-based rate limit to unauthenticated routes
+- `app/api/analyze/route.ts`: per-user quota check before Groq is called; quota stored in `ai_usage` table
+- `app/api/upload/route.ts`: per-user upload rate limit
 
 **Quota check logic:**
 ```typescript
@@ -373,7 +373,7 @@ if (usageThisMonth >= MONTHLY_ANALYSIS_QUOTA) {
 
 ---
 
-### Milestone 4D — Public Deployment (requires approval)
+### Milestone 4D: Public Deployment (requires approval)
 
 **Deliverables:** App live at `https://<project>.vercel.app` with all systems functional.
 
@@ -388,7 +388,7 @@ if (usageThisMonth >= MONTHLY_ANALYSIS_QUOTA) {
 
 ---
 
-### Milestone 4E — Observability (requires approval)
+### Milestone 4E: Observability (requires approval)
 
 **Deliverables:** PostHog analytics + Sentry (or Vercel logs fallback) in production.
 
@@ -401,14 +401,14 @@ if (usageThisMonth >= MONTHLY_ANALYSIS_QUOTA) {
 
 ---
 
-### Milestone 4F — Privacy, ToS, and Launch Readiness
+### Milestone 4F: Privacy, ToS, and Launch Readiness
 
 **Deliverables:** Privacy Policy and Terms of Service pages. User data deletion endpoint. "Delete my data" UI.
 
 **Codebase changes:**
-- `app/privacy/page.tsx` — Privacy Policy
-- `app/terms/page.tsx` — Terms of Service
-- `app/api/user/data/route.ts` — `DELETE` endpoint: removes all analyses, skill records, roadmap data for authenticated user
+- `app/privacy/page.tsx`: Privacy Policy
+- `app/terms/page.tsx`: Terms of Service
+- `app/api/user/data/route.ts`: `DELETE` endpoint: removes all analyses, skill records, roadmap data for authenticated user
 - Dashboard settings: "Delete my data" button
 
 **Legal flag:** Both documents require review before publication. The Privacy Policy must accurately disclose that resume text is sent to Groq for processing. Do not publish without review.
@@ -419,14 +419,14 @@ if (usageThisMonth >= MONTHLY_ANALYSIS_QUOTA) {
 
 Before any milestone begins, explicit approval is required for each of the following:
 
-- [ ] **4A** — Begin Neon PostgreSQL + Drizzle migration
-- [ ] **4B** — Set up Clerk Hobby account and configure Google Sign-In
-- [ ] **4C** — Set up Upstash Redis account; confirm whether card is required
-- [ ] **4D** — Deploy to Vercel; confirm repo will be public (required for free Actions)
-- [ ] **4E** — Set up PostHog account; set up Sentry account (confirm card-free) or confirm Vercel logs fallback
-- [ ] **4F** — Privacy Policy and ToS reviewed and approved for publication
-- [ ] **Quota policy** — confirm 10 analyses/user/month as the launch quota
-- [ ] **Vercel commercial use** — confirm Ascend's portfolio use qualifies as non-commercial under Vercel Hobby ToS
+- [ ] **4A**: Begin Neon PostgreSQL + Drizzle migration
+- [ ] **4B**: Set up Clerk Hobby account and configure Google Sign-In
+- [ ] **4C**: Set up Upstash Redis account; confirm whether card is required
+- [ ] **4D**: Deploy to Vercel; confirm repo will be public (required for free Actions)
+- [ ] **4E**: Set up PostHog account; set up Sentry account (confirm card-free) or confirm Vercel logs fallback
+- [ ] **4F**: Privacy Policy and ToS reviewed and approved for publication
+- [ ] **Quota policy**: confirm 10 analyses/user/month as the launch quota
+- [ ] **Vercel commercial use**: confirm Ascend's portfolio use qualifies as non-commercial under Vercel Hobby ToS
 
 ---
 
@@ -444,6 +444,6 @@ Before any milestone begins, explicit approval is required for each of the follo
 | Error monitoring | Console logs | Sentry Developer or Vercel logs |
 | AI reliability | 30s timeout, 2 retries, Zod validation | Same + 429 handling, per-user quota |
 | Privacy disclosure | None | Privacy Policy page (requires legal review) |
-| Demo mode | Fully functional | Unchanged — always public, no auth, no DB |
+| Demo mode | Fully functional | Unchanged: always public, no auth, no DB |
 | CI/CD | typecheck+lint+test+build on PR | Same + deploy on merge to `main` |
 | Monthly cost | $0 (local only) | **$0** (all genuine free tiers) |

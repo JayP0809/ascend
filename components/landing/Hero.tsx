@@ -49,7 +49,7 @@ export function Hero({ onStartAnalysis }: HeroProps) {
         </div>
       )}
 
-      {/* Content — class applied after mount so SSR HTML stays at opacity:1 */}
+      {/* Content: class applied after mount so SSR HTML stays at opacity:1 */}
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
         <div className={mounted ? 'animate-fade-up' : ''}>
           <div

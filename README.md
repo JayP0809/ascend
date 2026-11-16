@@ -11,7 +11,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-00e5b4?style=flat-square&logo=postgresql&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)
 
-Upload your resume. Pick a target role. Get a personalized, week-by-week AI roadmap with curated resources, hands-on projects, and skill gap analysis. Try it instantly in demo mode — no sign-in required.
+Upload your resume. Pick a target role. Get a personalized, week-by-week AI roadmap with curated resources, hands-on projects, and skill gap analysis. Try it instantly in demo mode; no sign-in required.
 
 </div>
 
@@ -21,16 +21,16 @@ Upload your resume. Pick a target role. Get a personalized, week-by-week AI road
 
 - **Resume upload:** drag-and-drop PDF or DOCX, or use the built-in public sample resume
 - **80+ roles:** autocomplete search across 10 industries (software engineering, data science, product, and more) with salary and demand data; internship and co-op roles supported
-- **Live AI analysis:** 4-stage Groq pipeline — skill extraction, role requirements, gap analysis, and 8-phase week-by-week roadmap generation
+- **Live AI analysis:** 4-stage Groq pipeline: skill extraction, role requirements, gap analysis, and 8-phase week-by-week roadmap generation
 - **5-tab dashboard:**
   - **Overview:** readiness gauge, matched skills, key strengths
   - **Skill Gap:** filterable grid of critical / nice-to-have / transferable skills
   - **Roadmap:** collapsible 8-phase timeline with curated resources and hands-on projects
-  - **Insights:** 4 charts — projections, market demand (illustrative), skill radar, role breakdown
+  - **Insights:** 4 charts: projections, market demand (illustrative), skill radar, role breakdown
   - **Export:** one-click PDF report
 - **Community feed:** anonymized aggregate career trends and trending skills
 - **Dark / light mode:** instant toggle, zero flicker
-- **Demo mode:** fully functional with realistic pre-generated data when no API key is configured — the entire app works without credentials
+- **Demo mode:** fully functional with realistic pre-generated data when no API key is configured; the entire app works without credentials
 
 ---
 
@@ -50,7 +50,7 @@ npm install --legacy-peer-deps
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The app runs immediately in demo mode — no API key or database needed.
+Open [http://localhost:3000](http://localhost:3000). The app runs immediately in demo mode; no API key or database needed.
 
 ---
 
@@ -117,8 +117,8 @@ See `.env.example` for all available configuration options.
 | **Styling** | Tailwind CSS + CSS custom properties |
 | **AI** | Groq API (`openai/gpt-oss-20b`) with 4-stage prompt pipeline |
 | **Database** | Neon PostgreSQL (serverless) + Drizzle ORM |
-| **Auth** | Auth.js v5 (next-auth@beta) — Google OAuth, JWT sessions |
-| **Charts** | Recharts — 5 chart types |
+| **Auth** | Auth.js v5 (next-auth@beta): Google OAuth, JWT sessions |
+| **Charts** | Recharts: 5 chart types |
 | **Resume parsing** | `pdf-parse` + `mammoth` |
 | **PDF export** | `jsPDF` + `jspdf-autotable` |
 | **Icons** | `lucide-react` |
@@ -184,14 +184,14 @@ Your Resume (PDF/DOCX)
         ↓
 ┌──────────────────────────────────────────────┐
 │              Groq AI Pipeline                │
-│  Stage 1 — Extract skills & experience       │
-│  Stage 2 — Fetch target role requirements    │
-│  Stage 3 — Identify skill gaps               │
-│  Stage 4 — Generate 8-phase roadmap          │
+│  Stage 1: Extract skills & experience       │
+│  Stage 2: Fetch target role requirements    │
+│  Stage 3: Identify skill gaps               │
+│  Stage 4: Generate 8-phase roadmap          │
 └──────────────────────────────────────────────┘
         ↓
    Interactive Dashboard
-  (saved to Neon PostgreSQL — authenticated users only)
+  (saved to Neon PostgreSQL (authenticated users only))
 ```
 
 Each AI stage uses Zod schema validation and automatic retry with a 30-second timeout.
@@ -211,7 +211,7 @@ Built as a portfolio piece showcasing production-grade full-stack engineering:
 | **Auth** | Auth.js v5 Google OAuth, JWT sessions, server-side access control |
 | **PostgreSQL + ORM** | Neon serverless PostgreSQL, Drizzle ORM, schema migrations |
 | **Quota enforcement** | Per-user and global monthly limits, atomic DB-backed reservation |
-| **Data visualization** | Recharts — radial gauge, area, bar, pie charts |
+| **Data visualization** | Recharts: radial gauge, area, bar, pie charts |
 | **Theming** | CSS custom properties + `next-themes` + Tailwind dark mode |
 | **Resume parsing** | PDF via `pdf-parse`, DOCX via `mammoth` |
 | **PDF export** | Client-side `jsPDF`, no server required |
@@ -264,4 +264,4 @@ Resume content is sent to [Groq's API](https://groq.com/privacy-policy/) for pro
 
 ## License
 
-MIT — free to use, fork, and deploy.
+MIT license. Free to use, fork, and deploy.

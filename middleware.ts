@@ -2,7 +2,7 @@
  * Next.js middleware.
  *
  * With Auth.js v5 and JWT sessions, route handlers call auth() directly from
- * lib/auth-config to read the session cookie — no middleware pre-attachment is
+ * lib/auth-config to read the session cookie: no middleware pre-attachment is
  * needed. This file is a no-op passthrough kept as a placeholder for future
  * security concerns (rate limiting, CSRF headers, etc.).
  *

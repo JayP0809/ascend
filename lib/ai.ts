@@ -51,10 +51,10 @@ const TIMEOUT_MS: Record<string, number> = {
 // headroom. Previously this limit was being hit for skill-heavy roles (e.g.
 // Frontend Developer) because the prompt allowed 5+ topics and 2 resources.
 const MAX_TOKENS: Record<string, number> = {
-  // 1536 — ml-engineer resume hits 1024 exactly (truncated); bumped 50% for headroom
+  // 1536: ml-engineer resume hits 1024 exactly (truncated); bumped 50% for headroom
   extractSkills:       1_536,
   getRoleRequirements: 2_048,
-  // 1536 — internship/co-op roles can produce many gap items + verbose summary;
+  // 1536: internship/co-op roles can produce many gap items + verbose summary;
   // 1024 was tight for student roles with 20+ foundational skill gaps.
   analyzeGap:          1_536,
   roadmapBatch1:       4_096,
@@ -62,7 +62,7 @@ const MAX_TOKENS: Record<string, number> = {
   default:             4_096,
 };
 
-// Only retry on parse / validation failures — NOT on timeout or token-limit
+// Only retry on parse / validation failures: NOT on timeout or token-limit
 // truncation, which will recur on the same prompt.
 const MAX_RETRIES = 1;
 
@@ -80,7 +80,7 @@ export interface GroqUsage {
   completionTokens: number;
   totalTokens: number;
   latencyMs: number;
-  // Groq pricing as of late 2025 for openai/gpt-oss-20b (free tier — $0)
+  // Groq pricing as of late 2025 for openai/gpt-oss-20b (free tier: $0)
   // Update if model changes. These are fallback estimates for other models.
   estimatedCostUsd: number;
 }
@@ -118,7 +118,7 @@ export class GroqTruncationError extends Error {
   constructor(stepName: string) {
     super(
       `AI step "${stepName}" output was cut off (token limit reached). ` +
-      `This is a prompt configuration issue — retrying will not help. ` +
+      `This is a prompt configuration issue: retrying will not help. ` +
       `Please report this to the site administrator.`
     );
     this.name = 'GroqTruncationError';
@@ -222,7 +222,7 @@ async function callAndValidate<T>(
     const { content, usage, finishReason } = await callGroqWithUsage(prompt, stepName);
     usages.push(usage);
 
-    // If the model hit the token limit the JSON is truncated — retrying with
+    // If the model hit the token limit the JSON is truncated: retrying with
     // the same prompt won't help; throw immediately so quota isn't burned on
     // doomed retries.
     if (finishReason === 'length') {
@@ -415,7 +415,7 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
   ]
 }
 
-Rules — follow exactly, no exceptions:
+Rules: follow exactly, no exceptions:
 - Return exactly 4 phases with these week_start/week_end pairs: ${weekList}
 - Return exactly 3 topics per phase (not 2, not 4, not 5)
 - Return exactly 1 resource per phase
@@ -434,7 +434,7 @@ Rules — follow exactly, no exceptions:
 // ---------------------------------------------------------------------------
 export class RoadmapAssemblyError extends Error {
   constructor(detail: string) {
-    super(`Roadmap assembly failed: ${detail}. This is a generation issue — no quota was double-counted.`);
+    super(`Roadmap assembly failed: ${detail}. This is a generation issue: no quota was double-counted.`);
     this.name = 'RoadmapAssemblyError';
   }
 }

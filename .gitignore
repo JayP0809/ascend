@@ -7,11 +7,11 @@ node_modules/
 .next/
 out/
 
-# Environment variables — never commit these
+# Environment variables: never commit these
 .env.local
 .env.*.local
 
-# Database file — local only
+# Database file: local only
 ascend.db
 *.db
 *.db-shm

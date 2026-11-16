@@ -3,7 +3,7 @@
  *
  * Uses @neondatabase/serverless HTTP transport instead of TCP so it works
  * regardless of whether the Neon compute is sleeping. Each statement is an
- * independent HTTP call and is auto-committed — no open transaction required.
+ * independent HTTP call and is auto-committed: no open transaction required.
  *
  * Usage:
  *   DATABASE_URL=... node scripts/migrate.mjs
@@ -29,7 +29,7 @@ if (!rawUrl) {
   process.exit(1);
 }
 
-// Use direct endpoint (no -pooler) for DDL — pooler may reject certain DDL patterns.
+// Use direct endpoint (no -pooler) for DDL: pooler may reject certain DDL patterns.
 const u = new URL(rawUrl);
 u.hostname = u.hostname.replace('-pooler', '');
 u.searchParams.delete('channel_binding');
@@ -78,7 +78,7 @@ async function main() {
     const stmts = extractStatements(ddl);
     console.log(`  apply ${hash} (${stmts.length} statements)`);
     for (const stmt of stmts) {
-      // sql([stmt]) was removed in @neondatabase/serverless v1.2.1 —
+      // sql([stmt]) was removed in @neondatabase/serverless v1.2.1 :
       // sql.query(stmt) is the correct raw-string execution API.
       await sql.query(stmt);
     }

@@ -97,7 +97,7 @@ describe('buildProgressionData', () => {
     expect(buildProgressionData(50, 8)).toHaveLength(9);
   });
 
-  it('is deterministic — same inputs produce identical output', () => {
+  it('is deterministic: same inputs produce identical output', () => {
     const a = buildProgressionData(67, 16);
     const b = buildProgressionData(67, 16);
     expect(a).toEqual(b);
@@ -203,7 +203,7 @@ const makeAnalysis = (overrides: Partial<AnalysisResult> = {}): AnalysisResult =
 });
 
 describe('buildMarketDemandData', () => {
-  it('is deterministic — same analysis produces identical output', () => {
+  it('is deterministic: same analysis produces identical output', () => {
     const analysis = makeAnalysis();
     const a = buildMarketDemandData(analysis);
     const b = buildMarketDemandData(analysis);

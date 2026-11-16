@@ -1,4 +1,4 @@
-# Ascend 2.0 — Cloud Connection Guide
+# Ascend 2.0: Cloud Connection Guide
 
 **Status:** Local implementation complete. This guide covers the steps to connect
 Neon, Clerk, and Vercel. No external resources have been provisioned yet.
@@ -34,14 +34,14 @@ Add these to Vercel's environment variable dashboard. Never commit them.
 # PostgreSQL (Neon)
 DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
 
-# Authentication (Clerk) — added after Clerk is configured
+# Authentication (Clerk): added after Clerk is configured
 CLERK_SECRET_KEY=sk_live_...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
 
 # AI
 GROQ_API_KEY=gsk_...
 
-# Rate limiting (Upstash) — added after Upstash is configured
+# Rate limiting (Upstash): added after Upstash is configured
 UPSTASH_REDIS_REST_URL=https://...upstash.io
 UPSTASH_REDIS_REST_TOKEN=...
 
@@ -49,7 +49,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 NEXT_PUBLIC_POSTHOG_KEY=phc_...
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 
-# Error monitoring (Sentry — optional)
+# Error monitoring (Sentry: optional)
 SENTRY_DSN=https://...@sentry.io/...
 ```
 
@@ -74,7 +74,7 @@ SENTRY_DSN=https://...@sentry.io/...
    ```bash
    npm run dev
    ```
-   Upload a resume and run an analysis — the result should persist and be retrievable.
+   Upload a resume and run an analysis: the result should persist and be retrievable.
 
 **Neon branching for safe migrations:**
 Before applying future migrations, create a Neon branch:
@@ -116,7 +116,7 @@ Before applying future migrations, create a Neon branch:
    };
    ```
 6. Update `app/layout.tsx` to wrap in `<ClerkProvider>`
-7. Update `lib/auth.ts` — replace the stub with Clerk's `auth()`:
+7. Update `lib/auth.ts`: replace the stub with Clerk's `auth()`:
    ```typescript
    import { auth } from '@clerk/nextjs/server';
    import { getUserByClerkId, upsertUser } from './db';
@@ -252,11 +252,11 @@ No card required. Create a free account at https://posthog.com.
 
 ## Remaining security concerns
 
-1. **Clerk webhook not yet implemented** — user records are created lazily on first API call. Consider adding a Clerk webhook endpoint to create user records on sign-up.
-2. **Analysis ID authorization** — currently any authenticated user can call `GET /api/analyze?id=X` with any UUID. Must add `WHERE user_id = currentUserId` check once auth is live.
-3. **Resume text in DB** — `analyses.resume_text` stores up to 8,000 chars of extracted resume text. Ensure Neon database access is restricted to the application's connection string only. Consider encrypting this column in a future milestone.
-4. **Rate limiting not yet live** — Upstash integration is documented but not yet implemented. Until it is, the per-user monthly quota (5/month) is the only protection against API abuse.
-5. **No ToS or Privacy Policy** — required before public launch. Must accurately disclose Groq processing of resume text.
+1. **Clerk webhook not yet implemented**: user records are created lazily on first API call. Consider adding a Clerk webhook endpoint to create user records on sign-up.
+2. **Analysis ID authorization**: currently any authenticated user can call `GET /api/analyze?id=X` with any UUID. Must add `WHERE user_id = currentUserId` check once auth is live.
+3. **Resume text in DB**: `analyses.resume_text` stores up to 8,000 chars of extracted resume text. Ensure Neon database access is restricted to the application's connection string only. Consider encrypting this column in a future milestone.
+4. **Rate limiting not yet live**: Upstash integration is documented but not yet implemented. Until it is, the per-user monthly quota (5/month) is the only protection against API abuse.
+5. **No ToS or Privacy Policy**: required before public launch. Must accurately disclose Groq processing of resume text.
 
 ---
 
@@ -265,7 +265,7 @@ No card required. Create a free account at https://posthog.com.
 Current branch: `phase-1a`
 
 Commits on this branch (not yet pushed or merged to main):
-1. `45a76d8` — Milestone 1+2+3: Engineering foundation and AI reliability
-2. `a66ec8a` — Milestone 4A: PostgreSQL/Drizzle migration (local preparation)
+1. `45a76d8`: Milestone 1+2+3: Engineering foundation and AI reliability
+2. `a66ec8a`: Milestone 4A: PostgreSQL/Drizzle migration (local preparation)
 
 **Waiting for your approval to push to GitHub.**

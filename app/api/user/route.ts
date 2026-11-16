@@ -31,7 +31,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   }
 
   if (!user) {
-    // DEV_BYPASS_ACTIVE with no user — no DB record to delete.
+    // DEV_BYPASS_ACTIVE with no user: no DB record to delete.
     return NextResponse.json({ deleted: true }, { status: 200 });
   }
 

@@ -1,4 +1,4 @@
-# Ascend 2.0 — Claude Code Project Context
+# Ascend 2.0: Claude Code Project Context
 
 This file is the persistent guiding context for all Claude Code sessions working on Ascend.
 Read it at the start of every session. Update it when meaningful decisions are made.
@@ -7,8 +7,8 @@ Read it at the start of every session. Update it when meaningful decisions are m
 
 ## About the Developer
 
-Jay Parmar — junior at Rutgers University–New Brunswick, CS + Data Science.
-Recruiting for full-time entry-level positions in 2027 (after Summer 2027 internship at Zebra Technologies — Supply Chain Analytics).
+Jay Parmar, junior at Rutgers University–New Brunswick, CS + Data Science.
+Recruiting for full-time entry-level positions in 2027 (after Summer 2027 internship at Zebra Technologies (Supply Chain Analytics)).
 Career targets span **software engineering, data engineering/analytics, data science/ML, and product roles**.
 Do not optimize Ascend exclusively for SWE. Build a broadly competitive technical profile.
 
@@ -49,11 +49,11 @@ AI-powered career navigation application. Core workflow:
 
 - No free trials, promotional credits, or expiring starter credits
 - No automatic billing, pay-as-you-go overages, or required credit card where avoidable
-- If a free tier is exhausted, the app must degrade gracefully — not charge money
+- If a free tier is exhausted, the app must degrade gracefully; it must not charge money
 - Every infrastructure service must have a documented, permanent free tier
 - This requirement applies to all future infrastructure decisions
 
-Groq's current model (`openai/gpt-oss-20b`) is free; if that changes, switch models or fall back to demo mode — do not auto-enable paid billing.
+Groq's current model (`openai/gpt-oss-20b`) is free; if that changes, switch models or fall back to demo mode; do not auto-enable paid billing.
 
 ---
 
@@ -61,14 +61,14 @@ Groq's current model (`openai/gpt-oss-20b`) is free; if that changes, switch mod
 
 - **Node:** v24.15.0 required (Next.js 14 crashes with createContext error on this version)
 - **Framework:** Next.js 15 App Router + React 19 + TypeScript
-- **Database:** better-sqlite3 v12.x (v9 has no prebuilt binaries for Node 24) — synchronous, local only, blocks Vercel/serverless
-- **AI:** Groq SDK — `isLiveMode()` in `lib/ai.ts` checks `GROQ_API_KEY`
+- **Database:** better-sqlite3 v12.x (v9 has no prebuilt binaries for Node 24): synchronous, local only, blocks Vercel/serverless
+- **AI:** Groq SDK: `isLiveMode()` in `lib/ai.ts` checks `GROQ_API_KEY`
 - **Demo mode:** `getDemoData()` runs when no API key or ID starts with `"demo-"`. Full app works without a key.
 - **Charts:** Recharts (RadialBarChart, BarChart, PieChart, AreaChart)
 - **Theme:** `next-themes`, `defaultTheme="dark"`, Tailwind `darkMode: 'class'`
 - **Testing:** Vitest 5.x + `@vitest/coverage-v8` (requires `vite` as peer; use `--legacy-peer-deps`)
 - **Validation:** Zod 4.x for API request validation
-- **CI:** `.github/workflows/ci.yml` — runs typecheck, lint, test, build on push/PR
+- **CI:** `.github/workflows/ci.yml`: runs typecheck, lint, test, build on push/PR
 
 **Install note:** All `npm install` commands need `--legacy-peer-deps` due to `@types/node` version conflict between puppeteer and vitest.
 
@@ -76,14 +76,14 @@ Groq's current model (`openai/gpt-oss-20b`) is free; if that changes, switch mod
 
 ## Development Branch
 
-Active development branch: `phase-1a` (Milestones 1 + 2 complete — not yet committed/pushed, awaiting approval).
+Active development branch: `phase-1a` (Milestones 1 + 2 complete (not yet committed/pushed, awaiting approval)).
 **Do not commit or push without explicit approval.**
 
 ---
 
 ## Completed Milestones
 
-### Milestone 1 — Engineering Foundation (complete, pending commit)
+### Milestone 1: Engineering Foundation (complete, pending commit)
 - Vitest + 28 unit tests for `lib/scorer.ts` (all pass)
 - GitHub Actions CI workflow (`.github/workflows/ci.yml`)
 - Removed unused `@anthropic-ai/sdk` dependency
@@ -93,28 +93,28 @@ Active development branch: `phase-1a` (Milestones 1 + 2 complete — not yet com
 - Zod validation on `POST /api/analyze` and `POST /api/upload`
 - Upload: 5 MB size limit, extension allowlist, MIME type check, magic byte verification
 - PDF export colors fixed: indigo `[99,102,241]` → warm accent `[224,122,95]`
-- ESLint flat config (`eslint.config.mjs`) — 0 errors, 0 warnings
+- ESLint flat config (`eslint.config.mjs`): 0 errors, 0 warnings
 - All quality gates: `typecheck` ✓ `lint` ✓ `test` (28/28) ✓ `build` ✓
 
-### Milestone 2 — AI Reliability (complete, pending commit)
+### Milestone 2: AI Reliability (complete, pending commit)
 - Zod schemas for all 4 AI response types in `lib/ai-schemas.ts`
 - `PROMPT_VERSION = '1.0.0'` for prompt version tracking
 - Full rewrite of `lib/ai.ts`: 30s timeout, 2 retries with Zod validation per attempt
-- `GroqUsage` + `PipelineUsage` types — per-call token/latency/cost reporting
+- `GroqUsage` + `PipelineUsage` types: per-call token/latency/cost reporting
 - Synthetic eval fixtures in `evals/fixtures/resumes.ts` (no PII)
 - Evaluation runner in `evals/runner.ts`: 17 deterministic evals + live API evals gated by `RUN_EVALS=true`
 - All quality gates still pass after Milestone 2 changes
 
-### Milestone 3 — Production Architecture Proposal (complete, pending approval)
+### Milestone 3: Production Architecture Proposal (complete, pending approval)
 - Written as `docs/production-architecture-proposal.md`
 - Covers: DB (Neon+Drizzle), auth (Auth.js v5 + Google OAuth), hosting (Vercel), rate limiting (Upstash), monitoring (Sentry)
-- **Updated in current session** — zero-cost compliance matrix being researched and will replace the previous draft
+- **Updated in current session:** zero-cost compliance matrix being researched and will replace the previous draft
 
 ---
 
 ## Approved Next Milestones
 
-### Milestone 4 — Zero-Cost Production Architecture (approved, in research)
+### Milestone 4: Zero-Cost Production Architecture (approved, in research)
 - Verify all infrastructure providers have genuine ongoing free tiers (no trials, no auto-billing)
 - Produce zero-cost compliance matrix with limits, overage behavior, card requirements
 - Design final production architecture diagram + tradeoffs
@@ -170,13 +170,13 @@ Favor restrained, polished improvements over aesthetic experimentation.
 
 ## Privacy & Security Principles
 
-- Resume text is processed by Groq's API — **this must be disclosed to users**; do not claim it stays on our servers
+- Resume text is processed by Groq's API. **This must be disclosed to users**; do not claim it stays on our servers
 - Never log resume content, full analysis text, or API keys
 - File uploads: validate extension + MIME + magic bytes + 5 MB limit
-- SQL: parameterized queries only — no string interpolation in queries
+- SQL: parameterized queries only; no string interpolation in queries
 - Rate limiting: must be database-backed or Redis-backed in production (in-memory fails in serverless)
 - Per-user AI quota: 5–10 live analyses/month (exact number TBD after researching Groq limits)
-- ToS and Privacy Policy pages: not yet created — required before public launch; flag for legal review
+- ToS and Privacy Policy pages: not yet created. Required before public launch; flag for legal review
 - User data deletion: every user must be able to delete all their records
 - Analytics must be privacy-conscious: no PII in event properties, no cross-site tracking
 
