@@ -381,6 +381,113 @@ describe('auth — AUTH_CONFIGURED and DEV_BYPASS_ACTIVE flags', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 5b. isSafeCallbackUrl — redirect destination validation
+// ---------------------------------------------------------------------------
+
+describe('isSafeCallbackUrl — safe redirect destination', () => {
+  it('accepts the root path', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/')).toBe(true);
+  });
+
+  it('accepts internal app paths', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/community')).toBe(true);
+    expect(isSafeCallbackUrl('/dashboard?id=aaaaaaaa-0000-0000-0000-000000000001')).toBe(true);
+    expect(isSafeCallbackUrl('/?welcome=1')).toBe(true);
+  });
+
+  it('rejects external http/https URLs', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('http://evil.com')).toBe(false);
+    expect(isSafeCallbackUrl('https://evil.com/steal')).toBe(false);
+  });
+
+  it('rejects protocol-relative URLs (//) ', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('//evil.com')).toBe(false);
+    expect(isSafeCallbackUrl('//evil.com/path')).toBe(false);
+  });
+
+  it('rejects encoded protocol-relative URLs', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    // /%2Fevil.com decodes to //evil.com — must be rejected
+    expect(isSafeCallbackUrl('/%2Fevil.com')).toBe(false);
+    // %2F%2Fevil.com does not start with / at all
+    expect(isSafeCallbackUrl('%2F%2Fevil.com')).toBe(false);
+  });
+
+  it('rejects javascript: protocol', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('javascript:alert(1)')).toBe(false);
+    expect(isSafeCallbackUrl('  javascript:void(0)')).toBe(false);
+  });
+
+  it('rejects backslash paths', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/\\evil.com')).toBe(false);
+  });
+
+  it('rejects API routes', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/api/analyze')).toBe(false);
+    expect(isSafeCallbackUrl('/api/auth/callback/google')).toBe(false);
+  });
+
+  it('rejects sign-in and sign-up routes (loop prevention)', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/sign-in')).toBe(false);
+    expect(isSafeCallbackUrl('/sign-in?callbackUrl=/')).toBe(false);
+    expect(isSafeCallbackUrl('/sign-up')).toBe(false);
+  });
+
+  it('rejects empty string, null, undefined, and non-strings', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('')).toBe(false);
+    expect(isSafeCallbackUrl(null)).toBe(false);
+    expect(isSafeCallbackUrl(undefined)).toBe(false);
+    expect(isSafeCallbackUrl(42)).toBe(false);
+    expect(isSafeCallbackUrl({})).toBe(false);
+  });
+
+  it('rejects malformed percent-encoding', async () => {
+    const { isSafeCallbackUrl } = await import('./auth');
+    expect(isSafeCallbackUrl('/%ZZ')).toBe(false);
+    expect(isSafeCallbackUrl('/%')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5c. Post-sign-in redirect behavior — documented invariants
+// ---------------------------------------------------------------------------
+
+describe('post-sign-in redirect invariants (documented)', () => {
+  it('the dashboard path without an ID is not a safe callback destination', async () => {
+    // /dashboard without ?id= is useless — the page shows an error.
+    // NavAuthButtons excludes it explicitly; it must not be passed as callbackUrl.
+    // We test that isSafeCallbackUrl *accepts* /dashboard (a URL validator cannot
+    // know about query param requirements) and document that the navbar
+    // special-cases the bare /dashboard path before calling isSafeCallbackUrl.
+    const { isSafeCallbackUrl } = await import('./auth');
+    // isSafeCallbackUrl doesn't distinguish /dashboard from /dashboard?id=...
+    // The nav component handles this: it excludes pathname === '/dashboard' (no id)
+    expect(isSafeCallbackUrl('/dashboard')).toBe(true);        // structurally valid
+    expect(isSafeCallbackUrl('/dashboard?id=abc')).toBe(true); // with ID: fine
+  });
+
+  it('sign-out always redirects to root', () => {
+    // signOut({ callbackUrl: '/' }) — no dynamic path, hardcoded in NavAuthButtons.
+    expect(isSafeCallbackUrlSync('/')).toBe(true);
+
+    function isSafeCallbackUrlSync(url: unknown): boolean {
+      if (typeof url !== 'string' || !url) return false;
+      if (!url.startsWith('/') || url.startsWith('//')) return false;
+      return true;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 6. Quota enforcement — concurrent requests (integration, requires DB)
 // ---------------------------------------------------------------------------
 

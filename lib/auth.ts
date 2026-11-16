@@ -147,3 +147,36 @@ export function requiresAuth(analysisId: string | undefined): boolean {
   if (!analysisId || analysisId.startsWith('demo-')) return false;
   return AUTH_CONFIGURED;
 }
+
+/**
+ * Returns true when `url` is a safe same-origin path that can be used as a
+ * post-sign-in or post-sign-out redirect destination.
+ *
+ * Accepts:   /             /dashboard?id=abc    /community
+ * Rejects:   //evil.com    http://evil.com      javascript:...
+ *            /api/...      /sign-in (loop)      backslashes
+ *            malformed %-encoding
+ *
+ * Never trust client-supplied callback URLs without calling this function.
+ */
+export function isSafeCallbackUrl(url: unknown): url is string {
+  if (typeof url !== 'string' || !url) return false;
+  // Must start with exactly one slash — not protocol-relative (//) and not
+  // something that only looks like a path after percent-decoding.
+  if (!url.startsWith('/') || url.startsWith('//')) return false;
+  // Reject backslash — some redirect handlers treat it as / and allow escape.
+  if (url.includes('\\')) return false;
+  // Check the decoded form does not escape the origin.
+  try {
+    const decoded = decodeURIComponent(url);
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) return false;
+    if (decoded.includes('://')) return false;
+  } catch {
+    return false; // malformed %-encoding
+  }
+  // Reject API routes — meaningless as redirect destinations.
+  if (url.startsWith('/api/')) return false;
+  // Reject auth routes — prevents infinite redirect loops.
+  if (url.startsWith('/sign-in') || url.startsWith('/sign-up')) return false;
+  return true;
+}

@@ -1,11 +1,33 @@
 import { signIn } from '@/lib/auth-config';
+import { isSafeCallbackUrl } from '@/lib/auth';
 
 /**
  * Sign-in page. Uses a Server Action to initiate the Google OAuth flow.
- * Auth.js handles the redirect to Google, the callback, and setting the
- * session cookie — no client-side JS needed for the sign-in trigger.
+ *
+ * callbackUrl handling:
+ *   Auth.js passes `callbackUrl` as a query param when it redirects here from
+ *   a protected route. We validate it server-side (render time) and embed the
+ *   safe value in a hidden field. The server action re-validates before passing
+ *   it to signIn() so the destination cannot be tampered with via form data.
+ *   Default when absent or invalid: '/'.
  */
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const params = await searchParams;
+  const rawCallback = params?.callbackUrl;
+  const safeCallbackUrl = isSafeCallbackUrl(rawCallback) ? rawCallback : '/';
+
+  async function handleSignIn(formData: FormData) {
+    'use server';
+    const redirectTo = formData.get('callbackUrl') as string | null;
+    // Re-validate: form data is user-controlled and must not be trusted.
+    const safeRedirect = isSafeCallbackUrl(redirectTo) ? redirectTo : '/';
+    await signIn('google', { redirectTo: safeRedirect });
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-8 px-6">
@@ -16,12 +38,8 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <form
-          action={async () => {
-            'use server';
-            await signIn('google', { redirectTo: '/dashboard' });
-          }}
-        >
+        <form action={handleSignIn}>
+          <input type="hidden" name="callbackUrl" value={safeCallbackUrl} />
           <button
             type="submit"
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-border bg-card text-primary font-medium text-sm hover:border-accent hover:text-accent transition-colors"
