@@ -22,11 +22,9 @@ import {
 
 // Integration tests require an explicitly isolated database URL.
 // Never use DATABASE_URL (production) — set TEST_DATABASE_URL instead.
-// When TEST_DATABASE_URL is set, forward it to DATABASE_URL so the db-client
-// module connects to the isolated database, not production.
-const TEST_DB_URL = process.env.TEST_DATABASE_URL;
-if (TEST_DB_URL) process.env.DATABASE_URL = TEST_DB_URL;
-const HAS_DB = !!TEST_DB_URL;
+// lib/db-client.ts prefers TEST_DATABASE_URL over DATABASE_URL so no
+// env-var overwriting is needed here.
+const HAS_DB = !!process.env.TEST_DATABASE_URL;
 
 // ---------------------------------------------------------------------------
 // No-database behavior (always runs in CI)

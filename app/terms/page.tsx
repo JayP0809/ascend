@@ -11,7 +11,7 @@ export default function TermsPage() {
     <main className="min-h-screen bg-background text-primary">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <h1 className="text-3xl font-semibold mb-2">Terms of Service</h1>
-        <p className="text-secondary text-sm mb-10">Last updated: November 2024</p>
+        <p className="text-secondary text-sm mb-10">Last updated: November 2026</p>
 
         <section className="space-y-8 text-[15px] leading-relaxed text-secondary">
 
