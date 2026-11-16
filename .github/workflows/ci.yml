@@ -52,7 +52,7 @@ jobs:
               try:
                   with open(path, encoding='utf-8', errors='ignore') as fh:
                       for i, line in enumerate(fh, 1):
-                          if '—' in line:
+                          if '—' in line or '&mdash;' in line or '&#8212;' in line:
                               found.append(f'{path}:{i}: {line.rstrip()}')
               except (OSError, IsADirectoryError):
                   pass
