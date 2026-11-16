@@ -1,39 +1,317 @@
-import { AnalysisResult, SkillExtraction, RoleRequirements, GapAnalysis, RoadmapWeek } from './types';
+import {
+  AnalysisResult,
+  SkillExtraction,
+  RoleRequirements,
+  GapAnalysis,
+  RoadmapWeek,
+  EmploymentContext,
+} from './types';
+import { classifyEmploymentLevel } from './employment-level';
+import {
+  PROMPT_VERSION,
+  SkillExtractionSchema,
+  RoleRequirementsSchema,
+  GapAnalysisSchema,
+  RoadmapBatchSchema,
+} from './ai-schemas';
+import { z } from 'zod';
 
 const DEMO_ANALYSIS_ID = 'demo-analysis-001';
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+
+// Per-step timeouts. Vercel Hobby with Fluid Compute supports up to 300 s.
+//
+// Execution order: Promise.all([extractSkills, getRoleRequirements]) → analyzeGap
+//   → roadmapBatch1 → roadmapBatch2 (the last two are sequential, not parallel).
+//
+// Worst-case wall time:
+//   Phase A (parallel):  max(25, 25)  = 25 s
+//   Phase B (analyzeGap):             = 20 s
+//   Phase C (batch1 + batch2):  30+30 = 60 s
+//   Total worst case:                 = 105 s (well within 300 s)
+//
+// Groq's current free model (openai/gpt-oss-20b) typically responds in 2-8 s
+// per call, so these ceilings provide 3-10× headroom over observed latency.
+const TIMEOUT_MS: Record<string, number> = {
+  extractSkills:        25_000,
+  getRoleRequirements:  25_000,
+  analyzeGap:           20_000,
+  roadmapBatch1:        30_000,
+  roadmapBatch2:        30_000,
+  default:              30_000,
+};
+
+// Per-step max_tokens.
+// Roadmap batches: after prompt tightening (exactly 3 topics + 1 resource per
+// phase) the expected output is ~1,000–1,500 tokens per batch. 4,096 gives 3×
+// headroom. Previously this limit was being hit for skill-heavy roles (e.g.
+// Frontend Developer) because the prompt allowed 5+ topics and 2 resources.
+const MAX_TOKENS: Record<string, number> = {
+  // 1536 — ml-engineer resume hits 1024 exactly (truncated); bumped 50% for headroom
+  extractSkills:       1_536,
+  getRoleRequirements: 2_048,
+  // 1536 — internship/co-op roles can produce many gap items + verbose summary;
+  // 1024 was tight for student roles with 20+ foundational skill gaps.
+  analyzeGap:          1_536,
+  roadmapBatch1:       4_096,
+  roadmapBatch2:       4_096,
+  default:             4_096,
+};
+
+// Only retry on parse / validation failures — NOT on timeout or token-limit
+// truncation, which will recur on the same prompt.
+const MAX_RETRIES = 1;
 
 export function isLiveMode(): boolean {
   const key = process.env.GROQ_API_KEY;
   return !!key && key !== 'your-groq-key-here' && key.length > 10;
 }
 
-async function callGroq(prompt: string): Promise<string> {
-  const Groq = (await import('groq-sdk')).default;
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-  const completion = await client.chat.completions.create({
-    model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
-    max_tokens: 4096,
-  });
-
-  return completion.choices[0]?.message?.content ?? '';
+// ---------------------------------------------------------------------------
+// Usage tracking
+// ---------------------------------------------------------------------------
+export interface GroqUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  // Groq pricing as of late 2025 for openai/gpt-oss-20b (free tier — $0)
+  // Update if model changes. These are fallback estimates for other models.
+  estimatedCostUsd: number;
 }
 
-async function parseJson<T>(raw: string): Promise<T> {
-  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]) as T;
-    throw new Error('Failed to parse AI response as JSON');
+// Cost per 1M tokens (input / output). Update when models change.
+const MODEL_COSTS: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+  'openai/gpt-oss-20b': { inputPer1M: 0, outputPer1M: 0 }, // free on Groq
+  'llama-3.1-70b-versatile': { inputPer1M: 0.59, outputPer1M: 0.79 },
+  'llama-3.3-70b-versatile': { inputPer1M: 0.59, outputPer1M: 0.79 },
+};
+
+function estimateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const costs = MODEL_COSTS[model];
+  if (!costs) return 0;
+  return (promptTokens * costs.inputPer1M + completionTokens * costs.outputPer1M) / 1_000_000;
+}
+
+// ---------------------------------------------------------------------------
+// Core Groq call with timeout and usage reporting
+// ---------------------------------------------------------------------------
+interface GroqResult {
+  content: string;
+  usage: GroqUsage;
+  finishReason: string | null;
+}
+
+export class GroqTimeoutError extends Error {
+  constructor(stepName: string, timeoutMs: number) {
+    super(`AI step "${stepName}" timed out after ${timeoutMs / 1000}s. Please try again.`);
+    this.name = 'GroqTimeoutError';
   }
 }
 
-async function extractSkills(resumeText: string): Promise<SkillExtraction> {
-  const prompt = `Analyze this resume and extract information. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
+export class GroqTruncationError extends Error {
+  constructor(stepName: string) {
+    super(
+      `AI step "${stepName}" output was cut off (token limit reached). ` +
+      `This is a prompt configuration issue — retrying will not help. ` +
+      `Please report this to the site administrator.`
+    );
+    this.name = 'GroqTruncationError';
+  }
+}
+
+export class GroqValidationError extends Error {
+  constructor(stepName: string) {
+    super(
+      `The AI returned an unexpected response for "${stepName}". ` +
+      `Please try again. If this keeps happening, try rephrasing the target role ` +
+      `(e.g., "Software Engineer" instead of a very specific or unusual title).`
+    );
+    this.name = 'GroqValidationError';
+  }
+}
+
+async function callGroqWithUsage(
+  prompt: string,
+  stepName: string
+): Promise<GroqResult> {
+  const Groq = (await import('groq-sdk')).default;
+  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+  const timeoutMs = TIMEOUT_MS[stepName] ?? TIMEOUT_MS.default;
+  const maxTokens = MAX_TOKENS[stepName] ?? MAX_TOKENS.default;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const start = Date.now();
+  try {
+    const completion = await client.chat.completions.create(
+      {
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: maxTokens,
+      },
+      { signal: controller.signal }
+    );
+
+    clearTimeout(timer);
+    const latencyMs = Date.now() - start;
+    const promptTokens = completion.usage?.prompt_tokens ?? 0;
+    const completionTokens = completion.usage?.completion_tokens ?? 0;
+    const finishReason = completion.choices[0]?.finish_reason ?? null;
+
+    console.info(
+      `[groq:${stepName}] finish_reason=${finishReason} prompt=${promptTokens} completion=${completionTokens} max=${maxTokens} latency=${latencyMs}ms`
+    );
+
+    return {
+      content: completion.choices[0]?.message?.content ?? '',
+      finishReason,
+      usage: {
+        model: MODEL,
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        latencyMs,
+        estimatedCostUsd: estimateCost(MODEL, promptTokens, completionTokens),
+      },
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    if (
+      err instanceof Error &&
+      (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('abort'))
+    ) {
+      throw new GroqTimeoutError(stepName, timeoutMs);
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// JSON extraction helper
+// ---------------------------------------------------------------------------
+function extractJson(raw: string): string {
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  return match ? match[0] : cleaned;
+}
+
+// ---------------------------------------------------------------------------
+// Validated call with retry
+// Retries up to MAX_RETRIES times on parse / validation failure only.
+// Timeout and token-limit truncation are non-retriable: they will recur
+// on the same prompt and waste quota budget.
+// ---------------------------------------------------------------------------
+async function callAndValidate<T>(
+  prompt: string,
+  schema: z.ZodType<T>,
+  stepName: string
+): Promise<{ data: T; usages: GroqUsage[] }> {
+  const usages: GroqUsage[] = [];
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    const { content, usage, finishReason } = await callGroqWithUsage(prompt, stepName);
+    usages.push(usage);
+
+    // If the model hit the token limit the JSON is truncated — retrying with
+    // the same prompt won't help; throw immediately so quota isn't burned on
+    // doomed retries.
+    if (finishReason === 'length') {
+      console.error(
+        `[groq:${stepName}] TRUNCATED on attempt ${attempt}: ` +
+        `completion=${usage.completionTokens} hit max_tokens limit. ` +
+        `prompt=${usage.promptTokens} total=${usage.promptTokens + usage.completionTokens}`
+      );
+      throw new GroqTruncationError(stepName);
+    }
+
+    const jsonStr = extractJson(content);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn(`[groq:${stepName}] JSON parse failed on attempt ${attempt}: ${e}`);
+      lastError = new Error(`${stepName}: JSON parse failed on attempt ${attempt}: ${e}`);
+      continue;
+    }
+
+    const result = schema.safeParse(parsed);
+    if (result.success) {
+      return { data: result.data, usages };
+    }
+
+    const issues = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    console.warn(`[groq:${stepName}] schema validation failed on attempt ${attempt}: ${issues}`);
+    // Store the debug message for internal logging but don't surface it to users.
+    lastError = new GroqValidationError(stepName);
+  }
+
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate usage from all pipeline steps
+// ---------------------------------------------------------------------------
+export interface PipelineUsage {
+  promptVersion: string;
+  steps: { name: string; usage: GroqUsage }[];
+  totals: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    latencyMs: number;
+    estimatedCostUsd: number;
+  };
+}
+
+function aggregateUsage(steps: { name: string; usages: GroqUsage[] }[]): PipelineUsage {
+  const flat = steps.flatMap((s) => s.usages.map((u) => ({ name: s.name, usage: u })));
+  const totals = flat.reduce(
+    (acc, { usage }) => ({
+      promptTokens: acc.promptTokens + usage.promptTokens,
+      completionTokens: acc.completionTokens + usage.completionTokens,
+      totalTokens: acc.totalTokens + usage.totalTokens,
+      latencyMs: acc.latencyMs + usage.latencyMs,
+      estimatedCostUsd: acc.estimatedCostUsd + usage.estimatedCostUsd,
+    }),
+    { promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, estimatedCostUsd: 0 }
+  );
+  return { promptVersion: PROMPT_VERSION, steps: flat, totals };
+}
+
+// ---------------------------------------------------------------------------
+// Employment-level context injected into role/gap/roadmap prompts.
+// Returns an empty string for 'experienced' (no-op) so prompts stay compact.
+// ---------------------------------------------------------------------------
+function employmentInstruction(ctx: EmploymentContext | undefined): string {
+  if (!ctx) return '';
+  switch (ctx.level) {
+    case 'internship':
+      return '\nIMPORTANT: This is an INTERNSHIP role. Calibrate for a student applicant: use beginner-friendly resources and achievable projects. Omit multi-year experience requirements.';
+    case 'coop':
+      return '\nIMPORTANT: This is a CO-OP role (4-8 months). Calibrate for a student: foundational to intermediate skills, relevant coursework, prior co-ops/internships a plus. Omit multi-year professional experience.';
+    case 'entry-level':
+      return '\nNOTE: This is entry-level / new-graduate. 0-2 years experience expected; degree, coursework, and projects count.';
+    case 'experienced':
+    default:
+      return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prompts (versioned via PROMPT_VERSION in ai-schemas.ts)
+// ---------------------------------------------------------------------------
+function skillExtractionPrompt(resumeText: string): string {
+  return `Analyze this resume and extract information. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 Resume:
 ${resumeText}
@@ -46,18 +324,10 @@ Return this exact JSON structure:
   "education": "Bachelor's in Computer Science",
   "top_titles": ["Software Engineer", "Developer"]
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<SkillExtraction>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<SkillExtraction>(retried);
-  }
 }
 
-async function getRoleRequirements(targetRole: string, jobDescription?: string): Promise<RoleRequirements> {
-  const prompt = `What are the requirements for a ${targetRole} role? ${jobDescription ? `Job description: ${jobDescription}` : ''}
+function roleRequirementsPrompt(targetRole: string, jobDescription?: string, employmentCtx?: EmploymentContext): string {
+  return `What are the requirements for a ${targetRole} role?${jobDescription ? ` Job description: ${jobDescription}` : ''}${employmentInstruction(employmentCtx)}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
@@ -70,24 +340,12 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
     "certifications": ["AWS Certified"]
   },
   "typical_timeline_months": 6,
-  "avg_salary": "$120,000",
-  "demand_level": "High"
+  "avg_salary": "$120,000"
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<RoleRequirements>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<RoleRequirements>(retried);
-  }
 }
 
-async function analyzeGap(
-  currentSkills: string[],
-  roleRequirements: RoleRequirements
-): Promise<GapAnalysis> {
-  const prompt = `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
+function gapAnalysisPrompt(currentSkills: string[], roleRequirements: RoleRequirements, employmentCtx?: EmploymentContext): string {
+  return `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.${employmentInstruction(employmentCtx)}
 
 Current skills: ${JSON.stringify(currentSkills)}
 Required skills: ${JSON.stringify(roleRequirements.required_skills)}
@@ -101,56 +359,191 @@ Nice to have: ${JSON.stringify(roleRequirements.nice_to_have)}
   "strengths_summary": "Strong background in...",
   "biggest_gap": "Docker and Kubernetes experience"
 }`;
-
-  const raw = await callGroq(prompt);
-  try {
-    return await parseJson<GapAnalysis>(raw);
-  } catch {
-    const retried = await callGroq(prompt);
-    return parseJson<GapAnalysis>(retried);
-  }
 }
 
-async function generateRoadmap(
+// Week assignments for the two batches.
+// Batch 1: phases 1-4 → weeks 1-2, 3-4, 5-6, 7-8
+// Batch 2: phases 5-8 → weeks 9-10, 11-12, 13-14, 15-16
+const BATCH_WEEK_PAIRS: [number, number][] = [
+  [1, 2], [3, 4], [5, 6], [7, 8],       // batch 1
+  [9, 10], [11, 12], [13, 14], [15, 16], // batch 2
+];
+
+export function roadmapBatchPrompt(
   gapAnalysis: GapAnalysis,
-  targetRole: string
-): Promise<RoadmapWeek[]> {
-  const prompt = `Create a week-by-week learning roadmap to become a ${targetRole}.
-Critical gaps to address: ${JSON.stringify(gapAnalysis.missing_critical)}
+  targetRole: string,
+  batchIndex: 0 | 1,  // 0 = phases 1-4, 1 = phases 5-8
+  employmentCtx?: EmploymentContext
+): string {
+  const pairs = BATCH_WEEK_PAIRS.slice(batchIndex * 4, batchIndex * 4 + 4);
+  const phaseNums = [1, 2, 3, 4].map((n) => n + batchIndex * 4);
+  const weekList = pairs.map(([s, e]) => `${s}-${e}`).join(', ');
+  const context = batchIndex === 0
+    ? 'Focus on foundational skills first.'
+    : 'Build on the foundational phases; cover advanced and integration skills.';
+
+  const employmentNote = employmentInstruction(employmentCtx);
+
+  // Cap the skills list passed to the model: beyond 12, 8 phases can't cover
+  // them meaningfully anyway, and a long list inflates both prompt and output.
+  // Internship/entry-level roles can produce 20+ foundational gaps.
+  const skillsToCover = gapAnalysis.missing_critical.slice(0, 12);
+
+  // Token budget constraints (keep phases compact so 4-phase batches fit
+  // well within max_tokens=4096 even for skill-heavy roles like Frontend Dev):
+  // - Exactly 3 topics per phase (prevents models from listing 5-7 topics)
+  // - Exactly 1 resource per phase (prevents 2-resource inflation)
+  // - Short focus_area, description, tech, milestone (word limits below)
+  return `Create phases ${phaseNums[0]}-${phaseNums[3]} of an 8-phase learning roadmap for ${targetRole}.
+Skills to cover across the full roadmap: ${JSON.stringify(skillsToCover)}
+${context}${employmentNote}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
   "weeks": [
     {
-      "week_start": 1,
-      "week_end": 2,
-      "focus_area": "Foundation",
-      "topics": ["Topic 1", "Topic 2"],
+      "week_start": ${pairs[0][0]},
+      "week_end": ${pairs[0][1]},
+      "focus_area": "short phrase",
+      "topics": ["topic1", "topic2", "topic3"],
       "resources": [
-        {"title": "Resource Title", "url": "https://example.com", "type": "Video"}
+        {"title": "Resource name", "url": "https://...", "type": "Docs"}
       ],
-      "project": {
-        "title": "Project Name",
-        "description": "Build a...",
-        "tech": ["Python", "Docker"],
-        "hours": 10
-      },
-      "milestone": "You will be able to..."
+      "project": {"title": "Project name", "description": "12 words max", "tech": ["tech1", "tech2"], "hours": 8},
+      "milestone": "15 words max"
     }
   ]
 }
 
-Create 8 phases covering all critical gaps. Use real resource URLs from YouTube, official docs, or Coursera.`;
+Rules — follow exactly, no exceptions:
+- Return exactly 4 phases with these week_start/week_end pairs: ${weekList}
+- Return exactly 3 topics per phase (not 2, not 4, not 5)
+- Return exactly 1 resource per phase
+- resource.type MUST be exactly one of: Video, Docs, Course, Article, Book
+- resource.url must be a real URL (docs.*, youtube.com, coursera.org, github.com)
+- Keep focus_area under 6 words
+- Keep project.description under 12 words
+- Keep project.tech to at most 2 items
+- Keep milestone under 15 words`;
+}
 
-  const raw = await callGroq(prompt);
-  try {
-    const result = await parseJson<{ weeks: RoadmapWeek[] }>(raw);
-    return result.weeks;
-  } catch {
-    const retried = await callGroq(prompt);
-    const result = await parseJson<{ weeks: RoadmapWeek[] }>(retried);
-    return result.weeks;
+// ---------------------------------------------------------------------------
+// Assembly validation
+// Verifies that two 4-phase batches form a coherent 8-phase roadmap.
+// Throws a descriptive Error (not consumed as quota) if anything is wrong.
+// ---------------------------------------------------------------------------
+export class RoadmapAssemblyError extends Error {
+  constructor(detail: string) {
+    super(`Roadmap assembly failed: ${detail}. This is a generation issue — no quota was double-counted.`);
+    this.name = 'RoadmapAssemblyError';
   }
+}
+
+function assembleBatchedRoadmap(
+  batch1Weeks: RoadmapWeek[],
+  batch2Weeks: RoadmapWeek[]
+): RoadmapWeek[] {
+  if (batch1Weeks.length !== 4) {
+    throw new RoadmapAssemblyError(`batch 1 returned ${batch1Weeks.length} phases, expected 4`);
+  }
+  if (batch2Weeks.length !== 4) {
+    throw new RoadmapAssemblyError(`batch 2 returned ${batch2Weeks.length} phases, expected 4`);
+  }
+
+  const all = [...batch1Weeks, ...batch2Weeks];
+
+  // Verify week continuity: each phase must start immediately after the previous ends.
+  for (let i = 1; i < all.length; i++) {
+    const prev = all[i - 1];
+    const curr = all[i];
+    if (curr.week_start !== prev.week_end + 1) {
+      throw new RoadmapAssemblyError(
+        `week gap between phase ${i} (ends week ${prev.week_end}) and phase ${i + 1} (starts week ${curr.week_start})`
+      );
+    }
+  }
+
+  // Each phase must have week_start < week_end.
+  for (let i = 0; i < all.length; i++) {
+    if (all[i].week_start >= all[i].week_end) {
+      throw new RoadmapAssemblyError(`phase ${i + 1} has week_start (${all[i].week_start}) >= week_end (${all[i].week_end})`);
+    }
+  }
+
+  return all;
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline functions
+// ---------------------------------------------------------------------------
+async function extractSkills(resumeText: string): Promise<{ data: SkillExtraction; usages: GroqUsage[] }> {
+  return callAndValidate(skillExtractionPrompt(resumeText), SkillExtractionSchema, 'extractSkills');
+}
+
+async function getRoleRequirements(
+  targetRole: string,
+  jobDescription?: string,
+  employmentCtx?: EmploymentContext
+): Promise<{ data: RoleRequirements; usages: GroqUsage[] }> {
+  return callAndValidate(
+    roleRequirementsPrompt(targetRole, jobDescription, employmentCtx),
+    RoleRequirementsSchema,
+    'getRoleRequirements'
+  );
+}
+
+async function analyzeGap(
+  currentSkills: string[],
+  roleRequirements: RoleRequirements,
+  employmentCtx?: EmploymentContext
+): Promise<{ data: GapAnalysis; usages: GroqUsage[] }> {
+  return callAndValidate(
+    gapAnalysisPrompt(currentSkills, roleRequirements, employmentCtx),
+    GapAnalysisSchema,
+    'analyzeGap'
+  );
+}
+
+async function generateRoadmap(
+  gapAnalysis: GapAnalysis,
+  targetRole: string,
+  employmentCtx?: EmploymentContext
+): Promise<{ data: RoadmapWeek[]; usages: GroqUsage[] }> {
+  // Sequential batches: generate phases 1-4 then 5-8.  Sequential (not
+  // parallel) to respect Groq rate limits and avoid concurrent requests.
+  const batch1 = await callAndValidate(
+    roadmapBatchPrompt(gapAnalysis, targetRole, 0, employmentCtx),
+    RoadmapBatchSchema,
+    'roadmapBatch1'
+  );
+  const batch2 = await callAndValidate(
+    roadmapBatchPrompt(gapAnalysis, targetRole, 1, employmentCtx),
+    RoadmapBatchSchema,
+    'roadmapBatch2'
+  );
+
+  // Fix week ranges to match the prescribed pairs if the model drifted.
+  // We trust phase count and content; we enforce week numbering ourselves
+  // so the assembly check always passes even if the model mis-numbered.
+  const fixWeeks = (weeks: RoadmapWeek[], batchIndex: 0 | 1): RoadmapWeek[] =>
+    weeks.map((w, i) => ({
+      ...w,
+      week_start: BATCH_WEEK_PAIRS[batchIndex * 4 + i][0],
+      week_end:   BATCH_WEEK_PAIRS[batchIndex * 4 + i][1],
+    }));
+
+  const fixed1 = fixWeeks(batch1.data.weeks, 0);
+  const fixed2 = fixWeeks(batch2.data.weeks, 1);
+  const assembled = assembleBatchedRoadmap(fixed1, fixed2);
+
+  return { data: assembled, usages: [...batch1.usages, ...batch2.usages] };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+export interface RunAnalysisResult extends AnalysisResult {
+  pipelineUsage?: PipelineUsage;
 }
 
 export async function runAnalysis(
@@ -158,28 +551,45 @@ export async function runAnalysis(
   resumeText: string,
   targetRole: string,
   jobDescription?: string
-): Promise<AnalysisResult> {
+): Promise<RunAnalysisResult> {
   if (!isLiveMode()) {
     return getDemoData(analysisId, targetRole);
   }
 
-  const [skillExtraction, roleRequirements] = await Promise.all([
+  const employmentCtx = classifyEmploymentLevel(targetRole, jobDescription);
+  if (employmentCtx.level !== 'experienced') {
+    console.info(
+      `[employment] level=${employmentCtx.level} confidence=${employmentCtx.confidence} ` +
+      `inferredFrom=${employmentCtx.inferredFrom} signals=${employmentCtx.signals.join('; ')}`
+    );
+  }
+
+  const [skillResult, roleResult] = await Promise.all([
     extractSkills(resumeText),
-    getRoleRequirements(targetRole, jobDescription),
+    getRoleRequirements(targetRole, jobDescription, employmentCtx),
   ]);
 
-  const gapAnalysis = await analyzeGap(skillExtraction.current_skills, roleRequirements);
-  const roadmap = await generateRoadmap(gapAnalysis, targetRole);
+  const gapResult = await analyzeGap(skillResult.data.current_skills, roleResult.data, employmentCtx);
+  const roadmapResult = await generateRoadmap(gapResult.data, targetRole, employmentCtx);
+
+  const pipelineUsage = aggregateUsage([
+    { name: 'extractSkills',      usages: skillResult.usages },
+    { name: 'getRoleRequirements', usages: roleResult.usages },
+    { name: 'analyzeGap',         usages: gapResult.usages },
+    // roadmapResult.usages already contains entries from both batch calls
+    { name: 'generateRoadmap',    usages: roadmapResult.usages },
+  ]);
 
   return {
     analysisId,
     targetRole,
-    skillExtraction,
-    roleRequirements,
-    gapAnalysis,
-    roadmap,
+    skillExtraction: skillResult.data,
+    roleRequirements: roleResult.data,
+    gapAnalysis: gapResult.data,
+    roadmap: roadmapResult.data,
     isDemoMode: false,
     createdAt: new Date().toISOString(),
+    pipelineUsage,
   };
 }
 
@@ -220,7 +630,6 @@ export function getDemoData(analysisId: string = DEMO_ANALYSIS_ID, targetRole = 
       },
       typical_timeline_months: 6,
       avg_salary: '$135,000',
-      demand_level: 'High',
     },
     gapAnalysis: {
       missing_critical: [
@@ -263,7 +672,7 @@ export function getDemoData(analysisId: string = DEMO_ANALYSIS_ID, targetRole = 
           { title: 'GitHub Actions Documentation', url: 'https://docs.github.com/en/actions', type: 'Docs' },
           { title: 'GitHub Actions Full Course (Fireship)', url: 'https://www.youtube.com/watch?v=R8_veQiYBjI', type: 'Video' },
         ],
-        project: { title: 'Full CI/CD Pipeline', description: 'Build a complete pipeline: code push → lint → test → Docker build → push to registry → deploy.', tech: ['GitHub Actions', 'Docker', 'Jest', 'YAML'], hours: 14 },
+        project: { title: 'Full CI/CD Pipeline', description: 'Build a complete pipeline: code push to lint to test to Docker build to push to registry to deploy.', tech: ['GitHub Actions', 'Docker', 'Jest', 'YAML'], hours: 14 },
         milestone: 'Every commit triggers automated tests and deployment. Can design CI/CD pipelines for any project.',
       },
       {

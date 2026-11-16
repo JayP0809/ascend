@@ -16,8 +16,8 @@ const FILTERS: Filter[] = ['All', 'Critical', 'Nice to Have', 'Transferable', 'Y
 
 function importanceBadge(importance: SkillGapItem['importance']) {
   const map = {
-    critical: { variant: 'danger', label: 'Critical' },
-    'nice-to-have': { variant: 'warning', label: 'Nice to have' },
+    critical: { variant: 'default', label: 'Critical' },
+    'nice-to-have': { variant: 'default', label: 'Nice to have' },
     transferable: { variant: 'accent', label: 'Transferable' },
     has: { variant: 'accent', label: 'You have it' },
   } as const;
@@ -27,7 +27,7 @@ function importanceBadge(importance: SkillGapItem['importance']) {
 
 function DemandIcon({ trend }: { trend: SkillGapItem['demandTrend'] }) {
   if (trend === 'up') return <TrendingUp className="h-3 w-3 text-accent" />;
-  if (trend === 'down') return <TrendingDown className="h-3 w-3 text-[var(--danger)]" />;
+  if (trend === 'down') return <TrendingDown className="h-3 w-3 text-muted" />;
   return <Minus className="h-3 w-3 text-muted" />;
 }
 
@@ -126,16 +126,11 @@ export function SkillGapTab({ data }: SkillGapTabProps) {
           <h3 className="text-sm font-semibold text-primary mb-3">Your transferable skills</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {transferable.map((skill) => (
-              <Card key={skill.name} className="flex items-start gap-3 py-4">
-                <div className="h-8 w-8 rounded-lg bg-[var(--accent)] bg-opacity-15 flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-primary">{skill.name}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    Carries over from your current experience and applies directly to {analysis.targetRole}.
-                  </p>
-                </div>
+              <Card key={skill.name}>
+                <p className="text-sm font-medium text-primary">{skill.name}</p>
+                <p className="text-xs text-muted mt-1">
+                  Carries over from your current experience and applies directly to {analysis.targetRole}.
+                </p>
               </Card>
             ))}
           </div>

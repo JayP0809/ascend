@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
+import { NavAuthButtons } from './NavAuthButtons';
 import { TrendingUp } from 'lucide-react';
 
 interface NavbarProps {
@@ -32,6 +33,7 @@ export function Navbar({ breadcrumb, actions }: NavbarProps) {
           </div>
           <div className="flex items-center gap-3">
             {actions}
+            <NavAuthButtons />
             <ThemeToggle />
           </div>
         </div>

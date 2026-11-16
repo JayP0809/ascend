@@ -5,9 +5,10 @@ import { clsx } from 'clsx';
 
 interface ResumeDropzoneProps {
   onUploadComplete: (analysisId: string) => void;
+  onSampleResumePreview?: () => void;
 }
 
-export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
+export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: ResumeDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
@@ -47,25 +48,16 @@ export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const handleSampleResume = async () => {
-    setUploading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/upload');
-      const data = await res.json();
-      setUploadedFile({ name: 'demo-resume.pdf', size: 'Sample' });
-      onUploadComplete(data.analysisId);
-    } catch {
-      setError('Failed to load sample resume');
-    } finally {
-      setUploading(false);
+  const handleSampleResume = () => {
+    if (onSampleResumePreview) {
+      onSampleResumePreview();
     }
   };
 
   if (uploadedFile) {
     return (
-      <div className="flex items-center gap-3 p-4 rounded-xl border border-success bg-[var(--success)] bg-opacity-10">
-        <CheckCircle className="h-5 w-5 text-[var(--success)] flex-shrink-0" />
+      <div className="flex items-center gap-3 p-4 rounded-xl border border-accent bg-accent-light">
+        <CheckCircle className="h-5 w-5 text-accent flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-primary truncate">{uploadedFile.name}</p>
           <p className="text-xs text-muted">{uploadedFile.size}</p>

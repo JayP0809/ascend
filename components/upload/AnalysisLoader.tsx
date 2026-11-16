@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const STEPS = [
   'Resume parsed',
@@ -84,7 +84,7 @@ export function AnalysisLoader({ analysisId, onComplete }: AnalysisLoaderProps) 
           >
             <div className="flex-shrink-0">
               {i < currentStep ? (
-                <CheckCircle className="h-5 w-5 text-[var(--success)]" />
+                <CheckCircle className="h-5 w-5 text-accent" />
               ) : i === currentStep ? (
                 <Loader2 className="h-5 w-5 text-accent animate-spin" />
               ) : (

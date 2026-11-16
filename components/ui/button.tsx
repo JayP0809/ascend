@@ -3,7 +3,7 @@ import * as React from 'react';
 import { clsx } from 'clsx';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost' | 'danger' | 'success';
+  variant?: 'default' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg' | 'icon';
   loading?: boolean;
 }
@@ -16,8 +16,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       default: 'bg-accent text-white hover:opacity-90 focus:ring-accent',
       outline: 'border border-border text-primary bg-transparent hover:bg-background focus:ring-accent',
       ghost: 'text-secondary hover:bg-background hover:text-primary focus:ring-accent',
-      danger: 'bg-danger text-white hover:opacity-90 focus:ring-danger',
-      success: 'bg-success text-white hover:opacity-90 focus:ring-success',
+      danger: 'bg-[var(--danger)] text-white hover:opacity-90 focus:ring-[var(--danger)]',
     };
 
     const sizes = {

@@ -1,8 +1,7 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Role } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: RoleSearchProps) {
+export function RoleSearch({ analysisId, onAnalysisStart: _onAnalysisStart, onAnalysisComplete }: RoleSearchProps) {
   const [query, setQuery] = useState('');
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -71,7 +70,31 @@ export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: 
     }
   };
 
-  const demandColor = (d: string) => d === 'High' ? 'success' : d === 'Medium' ? 'warning' : 'outline';
+  const handleSelectRole = (role: Role) => {
+    setSelectedRole(role);
+    setQuery(role.title);
+    setShowDropdown(false);
+  };
+
+  const handleSelectCustom = () => {
+    const title = query.trim();
+    if (!title) return;
+    const customRole: Role = {
+      id: 'custom',
+      title,
+      industry: 'Other',
+      demandLevel: 'Medium',
+      avgSalary: '',
+      icon: 'Target',
+      requiredSkillCount: 0,
+    };
+    setSelectedRole(customRole);
+    setShowDropdown(false);
+  };
+
+  const showCustomOption =
+    query.trim().length > 0 &&
+    !roles.some((r) => r.title.toLowerCase() === query.trim().toLowerCase());
 
   return (
     <div className="space-y-4">
@@ -79,7 +102,7 @@ export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
           <Input
-            placeholder="Search 80+ career roles..."
+            placeholder="Search career roles across 20+ industries..."
             value={query}
             onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); if (selectedRole) setSelectedRole(null); }}
             onFocus={() => setShowDropdown(true)}
@@ -87,23 +110,33 @@ export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: 
           />
         </div>
 
-        {showDropdown && roles.length > 0 && (
+        {showDropdown && (roles.length > 0 || showCustomOption) && (
           <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl border border-border bg-card shadow-lg overflow-hidden max-h-72 overflow-y-auto">
             {roles.map((role) => (
               <button
                 key={role.id}
-                onClick={() => { setSelectedRole(role); setQuery(role.title); setShowDropdown(false); }}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-background text-left transition-colors border-b border-border last:border-0"
+                onClick={() => handleSelectRole(role)}
+                className="w-full flex items-center px-4 py-3 hover:bg-background text-left transition-colors border-b border-border last:border-0"
               >
                 <div>
                   <p className="text-sm font-medium text-primary">{role.title}</p>
-                  <p className="text-xs text-muted">{role.industry} · {role.avgSalary} avg</p>
+                  <p className="text-xs text-muted">
+                    {role.industry}{role.avgSalary ? ` · ${role.avgSalary} avg` : ''}
+                  </p>
                 </div>
-                <Badge variant={demandColor(role.demandLevel) as 'success' | 'warning' | 'outline'}>
-                  {role.demandLevel} demand
-                </Badge>
               </button>
             ))}
+            {showCustomOption && (
+              <button
+                onClick={handleSelectCustom}
+                className="w-full flex items-center px-4 py-3 hover:bg-background text-left transition-colors border-t border-border"
+              >
+                <div>
+                  <p className="text-sm font-medium text-primary">Use &ldquo;{query.trim()}&rdquo;</p>
+                  <p className="text-xs text-muted">Custom career target</p>
+                </div>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -112,7 +145,9 @@ export function RoleSearch({ analysisId, onAnalysisStart, onAnalysisComplete }: 
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-light border border-accent border-opacity-30">
           <span className="text-sm text-accent font-medium">{selectedRole.title}</span>
           <span className="text-xs text-muted">· {selectedRole.industry}</span>
-          <span className="text-xs text-muted ml-auto">{selectedRole.avgSalary}</span>
+          {selectedRole.avgSalary && (
+            <span className="text-xs text-muted ml-auto">{selectedRole.avgSalary}</span>
+          )}
         </div>
       )}
 

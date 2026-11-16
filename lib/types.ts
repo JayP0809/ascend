@@ -6,6 +6,16 @@ export interface Role {
   avgSalary: string;
   icon: string;
   requiredSkillCount: number;
+  aliases?: string[];
+}
+
+export type EmploymentLevel = 'internship' | 'coop' | 'entry-level' | 'experienced';
+
+export interface EmploymentContext {
+  level: EmploymentLevel;
+  confidence: 'high' | 'medium' | 'low';
+  inferredFrom: 'job_description' | 'role_title' | 'default';
+  signals: string[];
 }
 
 export interface SkillRecord {
@@ -29,10 +39,15 @@ export interface RoadmapPhase {
   milestone: string;
 }
 
+// Canonical resource type labels.  The AI pipeline normalizes model output
+// to this set so the UI's RESOURCE_COLORS lookup always hits.
+export const RESOURCE_TYPES = ['Video', 'Docs', 'Course', 'Article', 'Book'] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
 export interface Resource {
   title: string;
   url: string;
-  type: 'Video' | 'Docs' | 'Course' | 'Article' | 'Book';
+  type: ResourceType;
 }
 
 export interface Project {
@@ -61,7 +76,9 @@ export interface RoleRequirements {
   };
   typical_timeline_months: number;
   avg_salary: string;
-  demand_level: 'High' | 'Medium' | 'Low';
+  // Optional: retained for backward compatibility with stored result_json records.
+  // No longer requested from the AI or rendered in the UI.
+  demand_level?: 'High' | 'Medium' | 'Low';
 }
 
 export interface GapAnalysis {

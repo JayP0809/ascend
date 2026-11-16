@@ -1,8 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { parseResume, truncateText } from '@/lib/parser';
-import { db } from '@/lib/db';
-import { getDemoData, isLiveMode } from '@/lib/ai';
+import { saveAnalysis } from '@/lib/db';
+import { isLiveMode } from '@/lib/ai';
+import { getCurrentUser } from '@/lib/auth';
+
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const ALLOWED_EXTENSIONS = /\.(pdf|docx|doc|txt)$/i;
+
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'text/plain',
+  'application/octet-stream',
+]);
+
+function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  if (buffer.length < 4) return false;
+
+  const isPdf      = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  const isZip      = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  const isDocLegacy = buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0;
+
+  if (mimeType === 'application/pdf') return isPdf;
+  if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return isZip;
+  if (mimeType === 'application/msword') return isDocLegacy || isZip;
+  if (mimeType === 'text/plain') return true;
+
+  return isPdf || isZip || isDocLegacy;
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -13,9 +41,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
+    if (!ALLOWED_EXTENSIONS.test(file.name)) {
+      return NextResponse.json(
+        { error: 'Only PDF, DOCX, DOC, or TXT files are accepted.' },
+        { status: 422 }
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `File exceeds the 5 MB limit (${(file.size / 1024 / 1024).toFixed(1)} MB received).` },
+        { status: 422 }
+      );
+    }
+
+    const bytes  = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const mimeType = file.type || 'application/pdf';
+    const mimeType = file.type || 'application/octet-stream';
+
+    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+      return NextResponse.json(
+        { error: 'Unsupported file type. Upload a PDF, DOCX, or TXT file.' },
+        { status: 422 }
+      );
+    }
+
+    if (!validateMagicBytes(buffer, mimeType)) {
+      return NextResponse.json(
+        { error: 'File content does not match the declared type. Please upload a valid PDF, DOCX, or TXT file.' },
+        { status: 422 }
+      );
+    }
 
     let resumeText: string;
     try {
@@ -35,14 +91,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const analysisId = uuidv4();
-    const truncated = truncateText(resumeText, 8000);
+    const truncated  = truncateText(resumeText, 8000);
 
-    // Save resume text temporarily
-    db.saveAnalysis(analysisId, truncated, '', null, 0, '{}');
+    // Bind to the authenticated user immediately if available.
+    // This establishes ownership at upload time so /api/analyze and /api/export
+    // can enforce IDOR checks without relying on a later binding step.
+    const user = await getCurrentUser(request);
+
+    // Save resume text — empty result_json placeholder, will be filled by /api/analyze
+    await saveAnalysis(analysisId, truncated, '', null, 0, '{}', { userId: user?.userId });
 
     return NextResponse.json({
       analysisId,
-      wordCount: truncated.split(/\s+/).length,
+      wordCount:  truncated.split(/\s+/).length,
       isDemoMode: !isLiveMode(),
     });
   } catch (error) {
@@ -54,7 +115,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(): Promise<NextResponse> {
-  // Return demo analysis ID for sample resume flow
-  const demoId = 'demo-sample-001';
-  return NextResponse.json({ analysisId: demoId, isDemoMode: true });
+  return NextResponse.json({ analysisId: 'demo-sample-001', isDemoMode: true });
 }

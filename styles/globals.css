@@ -12,8 +12,6 @@
   --border: #E5E2DC;
   --accent: #C2622B;
   --accent-light: #F5EDE8;
-  --success: #3d9a6e;
-  --warning: #A0785A;
   --danger: #c0392b;
   --shadow: 0 1px 3px rgba(28, 25, 23, 0.08), 0 1px 2px rgba(28, 25, 23, 0.05);
   --shadow-lg: 0 10px 25px rgba(28, 25, 23, 0.1);
@@ -29,8 +27,6 @@
   --border: #2E2A26;
   --accent: #E07A5F;
   --accent-light: #2E2219;
-  --success: #5aaa8a;
-  --warning: #C49A7A;
   --danger: #f87171;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
@@ -73,6 +69,25 @@ a {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* Hero content entrance animation — applied only after client mount.
+   Content renders visible (opacity: 1) in SSR HTML; CSS class is added
+   by useEffect so the animation only fires client-side. This prevents the
+   blank-page issue caused by framer-motion writing opacity:0 to SSR HTML. */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.6s ease forwards;
 }
 
 /* Floating skill tag animation */
@@ -157,20 +172,3 @@ textarea {
   border: 0.5px solid var(--border);
 }
 
-/* Custom checkbox */
-.custom-checkbox {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease !important;
-}
-
-.custom-checkbox.checked {
-  background: var(--success);
-  border-color: var(--success);
-}

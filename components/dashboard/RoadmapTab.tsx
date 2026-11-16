@@ -22,13 +22,6 @@ function getPhaseType(focusArea: string): PhaseFilter {
   return 'Learning';
 }
 
-const RESOURCE_COLORS: Record<string, string> = {
-  Video: 'var(--danger)',
-  Docs: 'var(--accent)',
-  Course: 'var(--warning)',
-  Article: 'var(--success)',
-  Book: 'var(--text-secondary)',
-};
 
 export function RoadmapTab({ data }: RoadmapTabProps) {
   const { analysis } = data;
@@ -51,7 +44,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
   const toggleComplete = (i: number) => {
     setCompleted((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
       return next;
     });
   };
@@ -59,7 +52,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
   const toggleExpand = (i: number) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
       return next;
     });
   };
@@ -111,7 +104,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
         <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
 
         <div className="space-y-4">
-          {filtered.map((phase, i) => {
+          {filtered.map((phase) => {
             const globalIndex = roadmap.indexOf(phase);
             const isDone = completed.has(globalIndex);
             const isCurrent = !isDone && globalIndex === [...Array(roadmap.length).keys()].find((idx) => !completed.has(idx));
@@ -122,7 +115,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                 {/* Timeline dot */}
                 <div className={clsx(
                   'absolute left-0 top-5 h-10 w-10 rounded-full border-2 flex items-center justify-center z-10 transition-all',
-                  isDone ? 'bg-[var(--success)] border-[var(--success)]' :
+                  isDone ? 'bg-accent border-accent' :
                   isCurrent ? 'bg-card border-accent' : 'bg-card border-border'
                 )}>
                   {isDone ? (
@@ -143,13 +136,10 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-muted">Week {phase.week_start}–{phase.week_end}</span>
-                        <Badge variant={
-                          getPhaseType(phase.focus_area) === 'Building' ? 'warning' :
-                          getPhaseType(phase.focus_area) === 'Applying' ? 'success' : 'accent'
-                        }>
+                        <Badge variant="accent">
                           {getPhaseType(phase.focus_area)}
                         </Badge>
-                        {isDone && <Badge variant="success">Done ✓</Badge>}
+                        {isDone && <Badge variant="accent">Done ✓</Badge>}
                       </div>
                       <p className="text-sm font-semibold text-primary mt-1">{phase.focus_area}</p>
                     </div>
@@ -190,8 +180,8 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                                   rel="noopener noreferrer"
                                   className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:border-accent hover:bg-background transition-colors group"
                                 >
-                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0" style={{ background: `${RESOURCE_COLORS[r.type] || 'var(--accent)'}20` }}>
-                                    <span className="text-xs font-bold" style={{ color: RESOURCE_COLORS[r.type] || 'var(--accent)' }}>{r.type[0]}</span>
+                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0 bg-accent-light">
+                                    <span className="text-xs font-bold text-accent">{r.type[0]}</span>
                                   </div>
                                   <span className="text-xs text-secondary group-hover:text-primary transition-colors flex-1 min-w-0 truncate">{r.title}</span>
                                   <ExternalLink className="h-3 w-3 text-muted flex-shrink-0" />
@@ -220,7 +210,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
 
                           {/* Milestone */}
                           <div className="flex items-start gap-2 text-xs text-secondary">
-                            <CheckCircle className="h-4 w-4 text-[var(--success)] flex-shrink-0 mt-0.5" />
+                            <CheckCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
                             <span><span className="font-semibold">Milestone:</span> {phase.milestone}</span>
                           </div>
 
@@ -230,8 +220,8 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                             className={clsx(
                               'w-full py-2 rounded-lg text-sm font-medium transition-all border',
                               isDone
-                                ? 'bg-[var(--success)] bg-opacity-15 text-[var(--success)] border-[var(--success)] border-opacity-30'
-                                : 'bg-background text-secondary border-border hover:border-[var(--success)] hover:text-[var(--success)]'
+                                ? 'bg-accent-light text-accent border-accent border-opacity-30'
+                                : 'bg-background text-secondary border-border hover:border-accent hover:text-accent'
                             )}
                           >
                             {isDone ? '✓ Phase complete' : 'Mark as complete'}

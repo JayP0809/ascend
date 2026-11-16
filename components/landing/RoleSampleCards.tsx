@@ -55,7 +55,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
           {SAMPLE_TRANSITIONS.map((item, i) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
               viewport={{ once: true }}
@@ -74,7 +74,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted">Starting readiness</span>
-                    <Badge variant={item.readiness >= 75 ? 'success' : 'warning'}>
+                    <Badge variant="outline">
                       {item.readiness}%
                     </Badge>
                   </div>
@@ -97,7 +97,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
           {STATS.map((stat, i) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={false}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               viewport={{ once: true }}

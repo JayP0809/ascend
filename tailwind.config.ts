@@ -18,8 +18,6 @@ const config: Config = {
         border: 'var(--border)',
         accent: 'var(--accent)',
         'accent-light': 'var(--accent-light)',
-        success: 'var(--success)',
-        warning: 'var(--warning)',
         danger: 'var(--danger)',
         'bg-primary': 'var(--bg-primary)',
       },
