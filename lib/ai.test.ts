@@ -466,6 +466,65 @@ describe('roadmap prompt — token budget constraints', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Employment level context in prompts
+// ---------------------------------------------------------------------------
+describe('roadmap prompt — employment level context', () => {
+  const baseGap = {
+    missing_critical: ['React', 'TypeScript'],
+    missing_nice: [],
+    transferable: ['JavaScript'],
+    readiness_score: 50,
+    strengths_summary: 'Strong JS fundamentals',
+    biggest_gap: 'React',
+  };
+
+  it('internship context appears in batch prompt', () => {
+    const internCtx = {
+      level: 'internship' as const,
+      confidence: 'high' as const,
+      inferredFrom: 'role_title' as const,
+      signals: ['internship keyword in role title'],
+    };
+    const prompt = roadmapBatchPrompt(baseGap, 'Frontend Developer Intern', 0, internCtx);
+    expect(prompt).toMatch(/INTERNSHIP/i);
+  });
+
+  it('coop context appears in batch prompt', () => {
+    const coopCtx = {
+      level: 'coop' as const,
+      confidence: 'high' as const,
+      inferredFrom: 'role_title' as const,
+      signals: ['"co-op" in role title'],
+    };
+    const prompt = roadmapBatchPrompt(baseGap, 'Software Engineering Co-op', 0, coopCtx);
+    expect(prompt).toMatch(/CO-OP/i);
+  });
+
+  it('entry-level context appears in batch prompt', () => {
+    const entryCtx = {
+      level: 'entry-level' as const,
+      confidence: 'medium' as const,
+      inferredFrom: 'job_description' as const,
+      signals: ['entry-level signals detected'],
+    };
+    const prompt = roadmapBatchPrompt(baseGap, 'Software Engineer', 0, entryCtx);
+    expect(prompt).toMatch(/entry-level/i);
+  });
+
+  it('experienced context adds no extra text to batch prompt', () => {
+    const expCtx = {
+      level: 'experienced' as const,
+      confidence: 'medium' as const,
+      inferredFrom: 'job_description' as const,
+      signals: ['no signals'],
+    };
+    const withCtx = roadmapBatchPrompt(baseGap, 'Software Engineer', 0, expCtx);
+    const withoutCtx = roadmapBatchPrompt(baseGap, 'Software Engineer', 0);
+    expect(withCtx).toBe(withoutCtx);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Live integration (requires GROQ_API_KEY in environment)
 // ---------------------------------------------------------------------------
 const HAS_GROQ = !!(process.env.GROQ_API_KEY);

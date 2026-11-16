@@ -18,7 +18,13 @@ import { v4 as uuidv4 } from 'uuid';
 const inFlightAnalyses = new Set<string>();
 
 const analyzeBodySchema = z.object({
-  analysisId:     z.string().uuid().optional(),
+  // Accept a real UUID for authenticated live-mode analyses, OR a demo-* prefixed
+  // ID for public demo flows.  Real UUID validation is NOT weakened — the union
+  // only adds the well-scoped demo prefix pattern.
+  analysisId: z.union([
+    z.string().uuid(),
+    z.string().regex(/^demo-[a-z0-9-]+$/i, 'Invalid analysis ID format'),
+  ]).optional(),
   targetRole:     z.string().min(1, 'Target role is required').max(200),
   jobDescription: z.string().max(5000).optional(),
 });
@@ -41,18 +47,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const isDemoFlow = !isLiveMode() || !!analysisId?.startsWith('demo-');
 
   // Demo flows bypass all authentication, quota, and dedup checks.
+  // Demo analyses are stateless and always served from getDemoData() — no DB save.
   if (isDemoFlow) {
     const result = getDemoData(analysisId || uuidv4(), targetRole);
     const dashboard = buildDashboardData(result);
-    await saveAnalysis(
-      result.analysisId,
-      result.skillExtraction.current_skills.join(', '),
-      targetRole,
-      jobDescription ?? null,
-      result.gapAnalysis.readiness_score,
-      JSON.stringify(result),
-      { isDemoMode: true }
-    );
     return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
   }
 

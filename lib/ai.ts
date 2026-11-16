@@ -4,7 +4,9 @@ import {
   RoleRequirements,
   GapAnalysis,
   RoadmapWeek,
+  EmploymentContext,
 } from './types';
+import { classifyEmploymentLevel } from './employment-level';
 import {
   PROMPT_VERSION,
   SkillExtractionSchema,
@@ -265,6 +267,25 @@ function aggregateUsage(steps: { name: string; usages: GroqUsage[] }[]): Pipelin
 }
 
 // ---------------------------------------------------------------------------
+// Employment-level context injected into role/gap/roadmap prompts.
+// Returns an empty string for 'experienced' (no-op) so prompts stay compact.
+// ---------------------------------------------------------------------------
+function employmentInstruction(ctx: EmploymentContext | undefined): string {
+  if (!ctx) return '';
+  switch (ctx.level) {
+    case 'internship':
+      return '\nIMPORTANT: This is an INTERNSHIP role. Calibrate for a student applicant: focus on foundational skills, coursework, and 1-2 portfolio projects. Omit multi-year experience requirements.';
+    case 'coop':
+      return '\nIMPORTANT: This is a CO-OP role (4-8 months). Calibrate for a student: foundational to intermediate skills, relevant coursework, prior co-ops/internships a plus. Omit multi-year professional experience.';
+    case 'entry-level':
+      return '\nNOTE: This is entry-level / new-graduate. 0-2 years experience expected; degree, coursework, and projects count.';
+    case 'experienced':
+    default:
+      return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Prompts (versioned via PROMPT_VERSION in ai-schemas.ts)
 // ---------------------------------------------------------------------------
 function skillExtractionPrompt(resumeText: string): string {
@@ -283,8 +304,8 @@ Return this exact JSON structure:
 }`;
 }
 
-function roleRequirementsPrompt(targetRole: string, jobDescription?: string): string {
-  return `What are the requirements for a ${targetRole} role?${jobDescription ? ` Job description: ${jobDescription}` : ''}
+function roleRequirementsPrompt(targetRole: string, jobDescription?: string, employmentCtx?: EmploymentContext): string {
+  return `What are the requirements for a ${targetRole} role?${jobDescription ? ` Job description: ${jobDescription}` : ''}${employmentInstruction(employmentCtx)}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
@@ -302,8 +323,8 @@ Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 }`;
 }
 
-function gapAnalysisPrompt(currentSkills: string[], roleRequirements: RoleRequirements): string {
-  return `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
+function gapAnalysisPrompt(currentSkills: string[], roleRequirements: RoleRequirements, employmentCtx?: EmploymentContext): string {
+  return `Perform a skill gap analysis. Respond ONLY with valid JSON. No markdown, no explanation, no backticks.${employmentInstruction(employmentCtx)}
 
 Current skills: ${JSON.stringify(currentSkills)}
 Required skills: ${JSON.stringify(roleRequirements.required_skills)}
@@ -330,7 +351,8 @@ const BATCH_WEEK_PAIRS: [number, number][] = [
 export function roadmapBatchPrompt(
   gapAnalysis: GapAnalysis,
   targetRole: string,
-  batchIndex: 0 | 1   // 0 = phases 1-4, 1 = phases 5-8
+  batchIndex: 0 | 1,  // 0 = phases 1-4, 1 = phases 5-8
+  employmentCtx?: EmploymentContext
 ): string {
   const pairs = BATCH_WEEK_PAIRS.slice(batchIndex * 4, batchIndex * 4 + 4);
   const phaseNums = [1, 2, 3, 4].map((n) => n + batchIndex * 4);
@@ -339,6 +361,8 @@ export function roadmapBatchPrompt(
     ? 'Focus on foundational skills first.'
     : 'Build on the foundational phases; cover advanced and integration skills.';
 
+  const employmentNote = employmentInstruction(employmentCtx);
+
   // Token budget constraints (keep phases compact so 4-phase batches fit
   // well within max_tokens=4096 even for skill-heavy roles like Frontend Dev):
   // - Exactly 3 topics per phase (prevents models from listing 5-7 topics)
@@ -346,7 +370,7 @@ export function roadmapBatchPrompt(
   // - Short focus_area, description, tech, milestone (word limits below)
   return `Create phases ${phaseNums[0]}-${phaseNums[3]} of an 8-phase learning roadmap for ${targetRole}.
 Skills to cover across the full roadmap: ${JSON.stringify(gapAnalysis.missing_critical)}
-${context}
+${context}${employmentNote}
 Respond ONLY with valid JSON. No markdown, no explanation, no backticks.
 
 {
@@ -432,10 +456,11 @@ async function extractSkills(resumeText: string): Promise<{ data: SkillExtractio
 
 async function getRoleRequirements(
   targetRole: string,
-  jobDescription?: string
+  jobDescription?: string,
+  employmentCtx?: EmploymentContext
 ): Promise<{ data: RoleRequirements; usages: GroqUsage[] }> {
   return callAndValidate(
-    roleRequirementsPrompt(targetRole, jobDescription),
+    roleRequirementsPrompt(targetRole, jobDescription, employmentCtx),
     RoleRequirementsSchema,
     'getRoleRequirements'
   );
@@ -443,10 +468,11 @@ async function getRoleRequirements(
 
 async function analyzeGap(
   currentSkills: string[],
-  roleRequirements: RoleRequirements
+  roleRequirements: RoleRequirements,
+  employmentCtx?: EmploymentContext
 ): Promise<{ data: GapAnalysis; usages: GroqUsage[] }> {
   return callAndValidate(
-    gapAnalysisPrompt(currentSkills, roleRequirements),
+    gapAnalysisPrompt(currentSkills, roleRequirements, employmentCtx),
     GapAnalysisSchema,
     'analyzeGap'
   );
@@ -454,17 +480,18 @@ async function analyzeGap(
 
 async function generateRoadmap(
   gapAnalysis: GapAnalysis,
-  targetRole: string
+  targetRole: string,
+  employmentCtx?: EmploymentContext
 ): Promise<{ data: RoadmapWeek[]; usages: GroqUsage[] }> {
   // Sequential batches: generate phases 1-4 then 5-8.  Sequential (not
   // parallel) to respect Groq rate limits and avoid concurrent requests.
   const batch1 = await callAndValidate(
-    roadmapBatchPrompt(gapAnalysis, targetRole, 0),
+    roadmapBatchPrompt(gapAnalysis, targetRole, 0, employmentCtx),
     RoadmapBatchSchema,
     'roadmapBatch1'
   );
   const batch2 = await callAndValidate(
-    roadmapBatchPrompt(gapAnalysis, targetRole, 1),
+    roadmapBatchPrompt(gapAnalysis, targetRole, 1, employmentCtx),
     RoadmapBatchSchema,
     'roadmapBatch2'
   );
@@ -503,13 +530,21 @@ export async function runAnalysis(
     return getDemoData(analysisId, targetRole);
   }
 
+  const employmentCtx = classifyEmploymentLevel(targetRole, jobDescription);
+  if (employmentCtx.level !== 'experienced') {
+    console.info(
+      `[employment] level=${employmentCtx.level} confidence=${employmentCtx.confidence} ` +
+      `inferredFrom=${employmentCtx.inferredFrom} signals=${employmentCtx.signals.join('; ')}`
+    );
+  }
+
   const [skillResult, roleResult] = await Promise.all([
     extractSkills(resumeText),
-    getRoleRequirements(targetRole, jobDescription),
+    getRoleRequirements(targetRole, jobDescription, employmentCtx),
   ]);
 
-  const gapResult = await analyzeGap(skillResult.data.current_skills, roleResult.data);
-  const roadmapResult = await generateRoadmap(gapResult.data, targetRole);
+  const gapResult = await analyzeGap(skillResult.data.current_skills, roleResult.data, employmentCtx);
+  const roadmapResult = await generateRoadmap(gapResult.data, targetRole, employmentCtx);
 
   const pipelineUsage = aggregateUsage([
     { name: 'extractSkills',      usages: skillResult.usages },

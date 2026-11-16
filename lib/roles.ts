@@ -2,30 +2,30 @@ import { Role } from './types';
 
 export const ROLES: Role[] = [
   // Tech
-  { id: 'software-engineer', title: 'Software Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$120,000', icon: 'Code2', requiredSkillCount: 18 },
-  { id: 'frontend-developer', title: 'Frontend Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$110,000', icon: 'Monitor', requiredSkillCount: 16 },
-  { id: 'backend-developer', title: 'Backend Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$125,000', icon: 'Server', requiredSkillCount: 17 },
-  { id: 'full-stack-developer', title: 'Full Stack Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$130,000', icon: 'Layers', requiredSkillCount: 22 },
-  { id: 'devops-engineer', title: 'DevOps Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$135,000', icon: 'GitBranch', requiredSkillCount: 20 },
-  { id: 'data-scientist', title: 'Data Scientist', industry: 'Tech', demandLevel: 'High', avgSalary: '$128,000', icon: 'BarChart2', requiredSkillCount: 19 },
-  { id: 'ml-engineer', title: 'ML Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$145,000', icon: 'Brain', requiredSkillCount: 21 },
-  { id: 'cybersecurity-analyst', title: 'Cybersecurity Analyst', industry: 'Tech', demandLevel: 'High', avgSalary: '$115,000', icon: 'Shield', requiredSkillCount: 18 },
-  { id: 'cloud-architect', title: 'Cloud Architect', industry: 'Tech', demandLevel: 'High', avgSalary: '$155,000', icon: 'Cloud', requiredSkillCount: 24 },
-  { id: 'mobile-developer', title: 'Mobile Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$118,000', icon: 'Smartphone', requiredSkillCount: 17 },
-  { id: 'qa-engineer', title: 'QA Engineer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$95,000', icon: 'CheckSquare', requiredSkillCount: 14 },
-  { id: 'data-engineer', title: 'Data Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$132,000', icon: 'Database', requiredSkillCount: 20 },
-  { id: 'ai-engineer', title: 'AI Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$150,000', icon: 'Cpu', requiredSkillCount: 22 },
-  { id: 'product-manager', title: 'Product Manager', industry: 'Tech', demandLevel: 'High', avgSalary: '$140,000', icon: 'Target', requiredSkillCount: 15 },
-  { id: 'ux-designer', title: 'UX Designer', industry: 'Tech', demandLevel: 'High', avgSalary: '$105,000', icon: 'Figma', requiredSkillCount: 16 },
-  { id: 'ui-designer', title: 'UI Designer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$98,000', icon: 'Palette', requiredSkillCount: 14 },
-  { id: 'site-reliability-engineer', title: 'Site Reliability Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$148,000', icon: 'Activity', requiredSkillCount: 22 },
-  { id: 'blockchain-developer', title: 'Blockchain Developer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$138,000', icon: 'Link', requiredSkillCount: 18 },
+  { id: 'software-engineer', title: 'Software Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$120,000', icon: 'Code2', requiredSkillCount: 18, aliases: ['SWE', 'software developer', 'software dev'] },
+  { id: 'frontend-developer', title: 'Frontend Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$110,000', icon: 'Monitor', requiredSkillCount: 16, aliases: ['FE developer', 'front-end developer', 'frontend engineer', 'UI developer'] },
+  { id: 'backend-developer', title: 'Backend Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$125,000', icon: 'Server', requiredSkillCount: 17, aliases: ['BE developer', 'back-end developer', 'backend engineer'] },
+  { id: 'full-stack-developer', title: 'Full Stack Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$130,000', icon: 'Layers', requiredSkillCount: 22, aliases: ['fullstack', 'full-stack engineer'] },
+  { id: 'devops-engineer', title: 'DevOps Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$135,000', icon: 'GitBranch', requiredSkillCount: 20, aliases: ['dev ops', 'infrastructure engineer', 'platform ops'] },
+  { id: 'data-scientist', title: 'Data Scientist', industry: 'Tech', demandLevel: 'High', avgSalary: '$128,000', icon: 'BarChart2', requiredSkillCount: 19, aliases: ['DS', 'data science'] },
+  { id: 'ml-engineer', title: 'ML Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$145,000', icon: 'Brain', requiredSkillCount: 21, aliases: ['MLE', 'machine learning engineer', 'AI/ML engineer'] },
+  { id: 'cybersecurity-analyst', title: 'Cybersecurity Analyst', industry: 'Tech', demandLevel: 'High', avgSalary: '$115,000', icon: 'Shield', requiredSkillCount: 18, aliases: ['cyber security', 'infosec analyst', 'security analyst'] },
+  { id: 'cloud-architect', title: 'Cloud Architect', industry: 'Tech', demandLevel: 'High', avgSalary: '$155,000', icon: 'Cloud', requiredSkillCount: 24, aliases: ['cloud engineer', 'solutions architect'] },
+  { id: 'mobile-developer', title: 'Mobile Developer', industry: 'Tech', demandLevel: 'High', avgSalary: '$118,000', icon: 'Smartphone', requiredSkillCount: 17, aliases: ['iOS developer', 'Android developer', 'mobile engineer'] },
+  { id: 'qa-engineer', title: 'QA Engineer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$95,000', icon: 'CheckSquare', requiredSkillCount: 14, aliases: ['quality assurance engineer', 'test engineer', 'SDET'] },
+  { id: 'data-engineer', title: 'Data Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$132,000', icon: 'Database', requiredSkillCount: 20, aliases: ['DE', 'data infrastructure engineer'] },
+  { id: 'ai-engineer', title: 'AI Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$150,000', icon: 'Cpu', requiredSkillCount: 22, aliases: ['artificial intelligence engineer', 'generative AI engineer'] },
+  { id: 'product-manager', title: 'Product Manager', industry: 'Tech', demandLevel: 'High', avgSalary: '$140,000', icon: 'Target', requiredSkillCount: 15, aliases: ['PM', 'product'] },
+  { id: 'ux-designer', title: 'UX Designer', industry: 'Tech', demandLevel: 'High', avgSalary: '$105,000', icon: 'Figma', requiredSkillCount: 16, aliases: ['UX', 'user experience designer', 'UX researcher'] },
+  { id: 'ui-designer', title: 'UI Designer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$98,000', icon: 'Palette', requiredSkillCount: 14, aliases: ['UI', 'user interface designer'] },
+  { id: 'site-reliability-engineer', title: 'Site Reliability Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$148,000', icon: 'Activity', requiredSkillCount: 22, aliases: ['SRE'] },
+  { id: 'blockchain-developer', title: 'Blockchain Developer', industry: 'Tech', demandLevel: 'Medium', avgSalary: '$138,000', icon: 'Link', requiredSkillCount: 18, aliases: ['web3 developer', 'smart contract developer'] },
   { id: 'security-engineer', title: 'Security Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$140,000', icon: 'Lock', requiredSkillCount: 20 },
   { id: 'platform-engineer', title: 'Platform Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$142,000', icon: 'Box', requiredSkillCount: 21 },
 
   // Finance
-  { id: 'investment-banking-analyst', title: 'Investment Banking Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$110,000', icon: 'TrendingUp', requiredSkillCount: 16 },
-  { id: 'financial-analyst', title: 'Financial Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$85,000', icon: 'DollarSign', requiredSkillCount: 14 },
+  { id: 'investment-banking-analyst', title: 'Investment Banking Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$110,000', icon: 'TrendingUp', requiredSkillCount: 16, aliases: ['IB analyst', 'IBD analyst', 'investment banker'] },
+  { id: 'financial-analyst', title: 'Financial Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$85,000', icon: 'DollarSign', requiredSkillCount: 14, aliases: ['FA', 'finance analyst'] },
   { id: 'portfolio-manager', title: 'Portfolio Manager', industry: 'Finance', demandLevel: 'Medium', avgSalary: '$125,000', icon: 'PieChart', requiredSkillCount: 18 },
   { id: 'risk-analyst', title: 'Risk Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$95,000', icon: 'AlertTriangle', requiredSkillCount: 15 },
   { id: 'actuary', title: 'Actuary', industry: 'Finance', demandLevel: 'Medium', avgSalary: '$108,000', icon: 'Calculator', requiredSkillCount: 17 },
@@ -34,11 +34,11 @@ export const ROLES: Role[] = [
   { id: 'financial-planner', title: 'Financial Planner', industry: 'Finance', demandLevel: 'Medium', avgSalary: '$90,000', icon: 'ClipboardList', requiredSkillCount: 14 },
   { id: 'hedge-fund-analyst', title: 'Hedge Fund Analyst', industry: 'Finance', demandLevel: 'Low', avgSalary: '$135,000', icon: 'TrendingUp', requiredSkillCount: 19 },
   { id: 'private-equity-associate', title: 'Private Equity Associate', industry: 'Finance', demandLevel: 'Low', avgSalary: '$145,000', icon: 'Briefcase', requiredSkillCount: 20 },
-  { id: 'quantitative-analyst', title: 'Quantitative Analyst', industry: 'Finance', demandLevel: 'Medium', avgSalary: '$140,000', icon: 'Function', requiredSkillCount: 22 },
+  { id: 'quantitative-analyst', title: 'Quantitative Analyst', industry: 'Finance', demandLevel: 'Medium', avgSalary: '$140,000', icon: 'Function', requiredSkillCount: 22, aliases: ['quant', 'quant analyst', 'quantitative finance'] },
 
   // Business
-  { id: 'management-consultant', title: 'Management Consultant', industry: 'Business', demandLevel: 'High', avgSalary: '$105,000', icon: 'Users', requiredSkillCount: 16 },
-  { id: 'business-analyst', title: 'Business Analyst', industry: 'Business', demandLevel: 'High', avgSalary: '$88,000', icon: 'BarChart', requiredSkillCount: 14 },
+  { id: 'management-consultant', title: 'Management Consultant', industry: 'Business', demandLevel: 'High', avgSalary: '$105,000', icon: 'Users', requiredSkillCount: 16, aliases: ['consultant', 'strategy consultant'] },
+  { id: 'business-analyst', title: 'Business Analyst', industry: 'Business', demandLevel: 'High', avgSalary: '$88,000', icon: 'BarChart', requiredSkillCount: 14, aliases: ['BA', 'systems analyst'] },
   { id: 'operations-manager', title: 'Operations Manager', industry: 'Business', demandLevel: 'High', avgSalary: '$95,000', icon: 'Settings', requiredSkillCount: 15 },
   { id: 'supply-chain-analyst', title: 'Supply Chain Analyst', industry: 'Business', demandLevel: 'High', avgSalary: '$82,000', icon: 'Package', requiredSkillCount: 14 },
   { id: 'project-manager', title: 'Project Manager', industry: 'Business', demandLevel: 'High', avgSalary: '$98,000', icon: 'Calendar', requiredSkillCount: 15 },
@@ -246,6 +246,55 @@ export const ROLES: Role[] = [
   { id: 'site-supervisor', title: 'Site Supervisor', industry: 'Construction', demandLevel: 'High', avgSalary: '$72,000', icon: 'HardHat', requiredSkillCount: 13 },
   { id: 'estimator', title: 'Cost Estimator', industry: 'Construction', demandLevel: 'High', avgSalary: '$75,000', icon: 'Calculator', requiredSkillCount: 14 },
   { id: 'building-inspector', title: 'Building Inspector', industry: 'Construction', demandLevel: 'Medium', avgSalary: '$65,000', icon: 'ClipboardCheck', requiredSkillCount: 13 },
+
+  // Communications & PR
+  { id: 'public-relations-specialist', title: 'Public Relations Specialist', industry: 'Communications', demandLevel: 'Medium', avgSalary: '$68,000', icon: 'Megaphone', requiredSkillCount: 13, aliases: ['PR specialist', 'communications specialist', 'PR'] },
+  { id: 'corporate-communications-manager', title: 'Corporate Communications Manager', industry: 'Communications', demandLevel: 'Medium', avgSalary: '$92,000', icon: 'MessageSquare', requiredSkillCount: 15 },
+  { id: 'communications-coordinator', title: 'Communications Coordinator', industry: 'Communications', demandLevel: 'Medium', avgSalary: '$55,000', icon: 'MessageCircle', requiredSkillCount: 12 },
+
+  // Supply Chain (expanded)
+  { id: 'supply-chain-manager', title: 'Supply Chain Manager', industry: 'Business', demandLevel: 'High', avgSalary: '$105,000', icon: 'Package', requiredSkillCount: 17 },
+  { id: 'procurement-analyst', title: 'Procurement Analyst', industry: 'Business', demandLevel: 'High', avgSalary: '$78,000', icon: 'ShoppingCart', requiredSkillCount: 14, aliases: ['sourcing analyst', 'purchasing analyst'] },
+  { id: 'logistics-coordinator', title: 'Logistics Coordinator', industry: 'Business', demandLevel: 'High', avgSalary: '$62,000', icon: 'Truck', requiredSkillCount: 13, aliases: ['logistics specialist', 'shipping coordinator'] },
+  { id: 'operations-research-analyst', title: 'Operations Research Analyst', industry: 'Business', demandLevel: 'High', avgSalary: '$92,000', icon: 'Network', requiredSkillCount: 17, aliases: ['OR analyst', 'optimization analyst'] },
+
+  // Allied Health (expanded)
+  { id: 'speech-language-pathologist', title: 'Speech-Language Pathologist', industry: 'Medicine', demandLevel: 'High', avgSalary: '$92,000', icon: 'MessageCircle', requiredSkillCount: 18, aliases: ['SLP', 'speech therapist', 'speech pathologist'] },
+  { id: 'dental-hygienist', title: 'Dental Hygienist', industry: 'Medicine', demandLevel: 'High', avgSalary: '$82,000', icon: 'Smile', requiredSkillCount: 14 },
+  { id: 'respiratory-therapist', title: 'Respiratory Therapist', industry: 'Medicine', demandLevel: 'High', avgSalary: '$68,000', icon: 'Wind', requiredSkillCount: 15, aliases: ['RT', 'respiratory care practitioner'] },
+  { id: 'diagnostic-sonographer', title: 'Diagnostic Medical Sonographer', industry: 'Medicine', demandLevel: 'High', avgSalary: '$78,000', icon: 'ScanLine', requiredSkillCount: 15, aliases: ['ultrasound technician', 'sonographer'] },
+  { id: 'clinical-social-worker', title: 'Clinical Social Worker', industry: 'Government', demandLevel: 'High', avgSalary: '$62,000', icon: 'HeartHandshake', requiredSkillCount: 16, aliases: ['LCSW', 'social worker', 'therapist'] },
+
+  // Skilled Trades
+  { id: 'electrician', title: 'Electrician', industry: 'Trades', demandLevel: 'High', avgSalary: '$62,000', icon: 'Zap', requiredSkillCount: 14 },
+  { id: 'plumber', title: 'Plumber', industry: 'Trades', demandLevel: 'High', avgSalary: '$58,000', icon: 'Wrench', requiredSkillCount: 13, aliases: ['pipefitter', 'plumbing technician'] },
+  { id: 'hvac-technician', title: 'HVAC Technician', industry: 'Trades', demandLevel: 'High', avgSalary: '$62,000', icon: 'Wind', requiredSkillCount: 14, aliases: ['HVAC installer', 'refrigeration technician'] },
+  { id: 'welder', title: 'Welder', industry: 'Trades', demandLevel: 'High', avgSalary: '$55,000', icon: 'Flame', requiredSkillCount: 13, aliases: ['welding technician', 'pipe welder'] },
+  { id: 'carpenter', title: 'Carpenter', industry: 'Trades', demandLevel: 'High', avgSalary: '$55,000', icon: 'Hammer', requiredSkillCount: 12 },
+
+  // Science (expanded)
+  { id: 'biochemist', title: 'Biochemist', industry: 'Science', demandLevel: 'Medium', avgSalary: '$92,000', icon: 'FlaskConical', requiredSkillCount: 20 },
+  { id: 'toxicologist', title: 'Toxicologist', industry: 'Science', demandLevel: 'Medium', avgSalary: '$88,000', icon: 'AlertTriangle', requiredSkillCount: 18 },
+  { id: 'pharmacologist', title: 'Pharmacologist', industry: 'Science', demandLevel: 'Medium', avgSalary: '$95,000', icon: 'Pill', requiredSkillCount: 20 },
+  { id: 'clinical-research-coordinator', title: 'Clinical Research Coordinator', industry: 'Science', demandLevel: 'High', avgSalary: '$62,000', icon: 'ClipboardList', requiredSkillCount: 15, aliases: ['CRC', 'clinical trials coordinator'] },
+
+  // IT Infrastructure
+  { id: 'it-support-specialist', title: 'IT Support Specialist', industry: 'Tech', demandLevel: 'High', avgSalary: '$55,000', icon: 'HelpCircle', requiredSkillCount: 12, aliases: ['help desk', 'IT helpdesk', 'technical support'] },
+  { id: 'network-engineer', title: 'Network Engineer', industry: 'Tech', demandLevel: 'High', avgSalary: '$92,000', icon: 'Network', requiredSkillCount: 17, aliases: ['network administrator', 'network analyst'] },
+  { id: 'database-administrator', title: 'Database Administrator', industry: 'Tech', demandLevel: 'High', avgSalary: '$98,000', icon: 'Database', requiredSkillCount: 16, aliases: ['DBA', 'database engineer'] },
+  { id: 'systems-administrator', title: 'Systems Administrator', industry: 'Tech', demandLevel: 'High', avgSalary: '$85,000', icon: 'Server', requiredSkillCount: 15, aliases: ['sysadmin', 'systems engineer'] },
+
+  // HR (expanded)
+  { id: 'hr-generalist', title: 'HR Generalist', industry: 'HR', demandLevel: 'High', avgSalary: '$62,000', icon: 'Users', requiredSkillCount: 13, aliases: ['human resources generalist', 'HR specialist'] },
+
+  // Internship & student-targeted roles
+  { id: 'software-engineering-intern', title: 'Software Engineering Intern', industry: 'Tech', demandLevel: 'High', avgSalary: '$35/hr', icon: 'Code2', requiredSkillCount: 10, aliases: ['SWE intern', 'software intern', 'coding intern', 'CS intern'] },
+  { id: 'data-science-intern', title: 'Data Science Intern', industry: 'Tech', demandLevel: 'High', avgSalary: '$30/hr', icon: 'BarChart2', requiredSkillCount: 9, aliases: ['data intern', 'ML intern', 'analytics intern'] },
+  { id: 'product-management-intern', title: 'Product Management Intern', industry: 'Tech', demandLevel: 'High', avgSalary: '$28/hr', icon: 'Target', requiredSkillCount: 8, aliases: ['PM intern', 'product intern', 'APM intern'] },
+  { id: 'ib-summer-analyst', title: 'Investment Banking Summer Analyst', industry: 'Finance', demandLevel: 'High', avgSalary: '$38/hr', icon: 'TrendingUp', requiredSkillCount: 12, aliases: ['IB summer analyst', 'banking intern', 'finance intern', 'summer analyst'] },
+  { id: 'marketing-intern', title: 'Marketing Intern', industry: 'Marketing', demandLevel: 'High', avgSalary: '$22/hr', icon: 'Megaphone', requiredSkillCount: 8, aliases: ['marketing coordinator intern', 'digital marketing intern'] },
+  { id: 'consulting-intern', title: 'Management Consulting Intern', industry: 'Business', demandLevel: 'High', avgSalary: '$35/hr', icon: 'Users', requiredSkillCount: 10, aliases: ['consulting intern', 'strategy intern', 'business analyst intern'] },
+  { id: 'research-intern', title: 'Research Intern', industry: 'Science', demandLevel: 'High', avgSalary: '$20/hr', icon: 'Microscope', requiredSkillCount: 8, aliases: ['lab intern', 'research assistant', 'undergraduate researcher'] },
 ];
 
 export function searchRoles(query: string): Role[] {
@@ -254,6 +303,7 @@ export function searchRoles(query: string): Role[] {
   return ROLES.filter(
     (r) =>
       r.title.toLowerCase().includes(q) ||
-      r.industry.toLowerCase().includes(q)
+      r.industry.toLowerCase().includes(q) ||
+      r.aliases?.some((a) => a.toLowerCase().includes(q))
   ).slice(0, 10);
 }

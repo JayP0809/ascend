@@ -6,6 +6,16 @@ export interface Role {
   avgSalary: string;
   icon: string;
   requiredSkillCount: number;
+  aliases?: string[];
+}
+
+export type EmploymentLevel = 'internship' | 'coop' | 'entry-level' | 'experienced';
+
+export interface EmploymentContext {
+  level: EmploymentLevel;
+  confidence: 'high' | 'medium' | 'low';
+  inferredFrom: 'job_description' | 'role_title' | 'default';
+  signals: string[];
 }
 
 export interface SkillRecord {
