@@ -114,11 +114,15 @@ function DashboardContent() {
         <div className="bg-[var(--warning)] bg-opacity-15 border-b border-[var(--warning)] border-opacity-20">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-primary">
-              <span className="font-semibold">Demo mode</span> - Showing sample data for a Software Engineer to DevOps Engineer transition.{' '}
-              <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                Add your Groq API key
-              </a>{' '}
-              to .env.local to analyze your real resume.
+              <span className="font-semibold">Sample analysis</span> - You&apos;re exploring a fictional career roadmap.{' '}
+              <Link href="/?step=preview" className="text-accent hover:underline">
+                View sample resume
+              </Link>
+              {' '}or{' '}
+              <Link href="/sign-in" className="text-accent hover:underline">
+                sign in
+              </Link>
+              {' '}to generate your own personalized roadmap.
             </p>
             <button
               onClick={() => setDemoBannerDismissed(true)}

@@ -1,21 +1,37 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/shared/Navbar';
 import { Hero } from '@/components/landing/Hero';
 import { RoleSampleCards } from '@/components/landing/RoleSampleCards';
+import { SampleResumePreview } from '@/components/landing/SampleResumePreview';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ResumeDropzone } from '@/components/upload/ResumeDropzone';
 import { RoleSearch } from '@/components/upload/RoleSearch';
 import { AnalysisLoader } from '@/components/upload/AnalysisLoader';
 
-type Step = 'upload' | 'role' | 'analyzing';
+// Stable demo ID for the sample resume flow — matches the GET /api/analyze handler.
+const DEMO_ANALYSIS_ID = 'demo-sample-001';
+
+type Step = 'upload' | 'resume-preview' | 'role' | 'analyzing';
 
 export default function HomePage() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>('upload');
   const [analysisId, setAnalysisId] = useState<string>('');
+
+  // Auto-open the sample resume preview when navigating back from the demo dashboard.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('step') === 'preview') {
+      setAnalysisId(DEMO_ANALYSIS_ID);
+      setStep('resume-preview');
+      setOpen(true);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   const handleOpen = () => {
     setStep('upload');
@@ -24,6 +40,11 @@ export default function HomePage() {
 
   const handleViewSample = (id: string) => {
     router.push(`/dashboard?id=${id}`);
+  };
+
+  const handleSampleResumePreview = () => {
+    setAnalysisId(DEMO_ANALYSIS_ID);
+    setStep('resume-preview');
   };
 
   const handleUploadComplete = (id: string) => {
@@ -39,6 +60,8 @@ export default function HomePage() {
     setOpen(false);
     router.push(`/dashboard?id=${data.analysisId}`);
   };
+
+  const isPreviewStep = step === 'resume-preview';
 
   return (
     <div style={{ background: 'var(--bg-primary)' }} className="min-h-screen">
@@ -78,16 +101,38 @@ export default function HomePage() {
                   We&apos;ll analyze your skills and match them to your target role.
                 </DialogDescription>
               </DialogHeader>
-              <ResumeDropzone onUploadComplete={handleUploadComplete} />
+              <ResumeDropzone
+                onUploadComplete={handleUploadComplete}
+                onSampleResumePreview={handleSampleResumePreview}
+              />
+            </>
+          )}
+
+          {isPreviewStep && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Sample resume</DialogTitle>
+                <DialogDescription>
+                  Explore the sample analysis using this fictional resume.
+                </DialogDescription>
+              </DialogHeader>
+              <SampleResumePreview
+                onBack={() => setStep('upload')}
+                onContinue={() => setStep('role')}
+              />
             </>
           )}
 
           {step === 'role' && (
             <>
               <DialogHeader>
-                <DialogTitle>Where do you want to go?</DialogTitle>
+                <DialogTitle>
+                  {analysisId === DEMO_ANALYSIS_ID ? 'Pick a target role' : 'Where do you want to go?'}
+                </DialogTitle>
                 <DialogDescription>
-                  Search for your target role and we&apos;ll generate a personalized roadmap.
+                  {analysisId === DEMO_ANALYSIS_ID
+                    ? "Choose a role to see a sample roadmap. No sign-in required."
+                    : "Search for your target role and we'll generate a personalized roadmap."}
                 </DialogDescription>
               </DialogHeader>
               <RoleSearch

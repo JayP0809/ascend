@@ -5,9 +5,10 @@ import { clsx } from 'clsx';
 
 interface ResumeDropzoneProps {
   onUploadComplete: (analysisId: string) => void;
+  onSampleResumePreview?: () => void;
 }
 
-export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
+export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: ResumeDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
@@ -47,18 +48,9 @@ export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const handleSampleResume = async () => {
-    setUploading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/upload');
-      const data = await res.json();
-      setUploadedFile({ name: 'demo-resume.pdf', size: 'Sample' });
-      onUploadComplete(data.analysisId);
-    } catch {
-      setError('Failed to load sample resume');
-    } finally {
-      setUploading(false);
+  const handleSampleResume = () => {
+    if (onSampleResumePreview) {
+      onSampleResumePreview();
     }
   };
 
