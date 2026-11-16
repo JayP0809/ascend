@@ -120,8 +120,20 @@ export default function TermsPage() {
               Ascend is a portfolio project created for educational and demonstration purposes. It is
               not a commercial service with guaranteed uptime, support, or SLAs. Use it accordingly.
             </p>
+            <p className="mt-2">
+              Source code is available at{' '}
+              <a
+                href="https://github.com/JayP0809/ascend"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                github.com/JayP0809/ascend
+              </a>
+              .
+            </p>
             <p className="mt-2 text-xs text-secondary/70">
-              [Owner: add GitHub repository link and/or contact email here before public launch.]
+              [Owner: add a private support contact email here before public launch if desired.]
             </p>
           </div>
 

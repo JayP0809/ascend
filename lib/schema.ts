@@ -75,8 +75,7 @@ export const skillRecords = pgTable('skill_records', {
 
 // ---------------------------------------------------------------------------
 // roadmap_phases
-// Week-by-week roadmap entries stored as JSON blobs. Mirroring the current
-// SQLite columns exactly so the existing app logic is unchanged.
+// Week-by-week roadmap entries stored as JSON blobs.
 // ---------------------------------------------------------------------------
 export const roadmapPhases = pgTable('roadmap_phases', {
   id:            uuid('id').primaryKey().defaultRandom(),

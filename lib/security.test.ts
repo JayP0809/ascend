@@ -123,7 +123,7 @@ describe('checkAnalysisAccess — Auth.js configured (production auth rules)', (
 //
 // This table is not an executable test; it documents what checkAnalysisAccess
 // returns for each combination of inputs. This is the "source of truth" to
-// compare against manual or integration tests when Clerk is live.
+// compare against manual or integration tests when auth is configured.
 //
 // | AUTH_CONFIGURED  | NODE_ENV     | user    | record.user_id | Expected    |
 // |------------------|--------------|---------|----------------|-------------|

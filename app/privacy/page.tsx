@@ -139,11 +139,19 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-medium text-primary mb-3">10. Contact</h2>
             <p>
               This project is a portfolio application. The developer&apos;s contact information
-              is not published here. For questions, open an issue on the project&apos;s GitHub
-              repository.
+              is not published here. For questions, open an issue on the project&apos;s{' '}
+              <a
+                href="https://github.com/JayP0809/ascend"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                GitHub repository
+              </a>
+              .
             </p>
             <p className="mt-2 text-xs text-secondary/70">
-              [Owner: add GitHub repository link and/or contact email here before public launch.]
+              [Owner: add a private support contact email here before public launch if desired.]
             </p>
           </div>
 

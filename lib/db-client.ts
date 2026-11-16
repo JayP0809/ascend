@@ -21,9 +21,12 @@ let _client: DbClient | null = null;
 export function getDbClient(): DbClient | null {
   if (_client !== null) return _client;
 
-  // TEST_DATABASE_URL takes precedence when running the test suite so
-  // integration tests never accidentally connect to the production database.
-  const url = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+  // TEST_DATABASE_URL is only honored outside production to prevent an
+  // accidentally-set env var from routing a live deployment to a test database.
+  const url =
+    (process.env.NODE_ENV !== 'production' && process.env.TEST_DATABASE_URL)
+      ? process.env.TEST_DATABASE_URL
+      : process.env.DATABASE_URL;
   if (!url) return null;
 
   try {
