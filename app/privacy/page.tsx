@@ -138,8 +138,8 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-medium text-primary mb-3">10. Contact</h2>
             <p>
-              This project is a portfolio application. The developer&apos;s contact information
-              is not published here. For questions, open an issue on the project&apos;s{' '}
+              This project is a portfolio application. For general questions, open an issue on the
+              project&apos;s{' '}
               <a
                 href="https://github.com/JayP0809/ascend"
                 target="_blank"
@@ -150,8 +150,12 @@ export default function PrivacyPage() {
               </a>
               .
             </p>
-            <p className="mt-2 text-xs text-secondary/70">
-              [Owner: add a private support contact email here before public launch if desired.]
+            <p className="mt-2">
+              For sensitive privacy requests — such as asking what data is stored about you or
+              requesting deletion — use the <strong className="text-primary">Delete Account</strong>{' '}
+              option in your account settings. This immediately and permanently removes all data
+              associated with your account without requiring you to share personal information
+              publicly.
             </p>
           </div>
 

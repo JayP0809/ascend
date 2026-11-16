@@ -132,9 +132,6 @@ export default function TermsPage() {
               </a>
               .
             </p>
-            <p className="mt-2 text-xs text-secondary/70">
-              [Owner: add a private support contact email here before public launch if desired.]
-            </p>
           </div>
 
         </section>
