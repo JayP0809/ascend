@@ -67,11 +67,11 @@ Each stage uses a dedicated Groq prompt validated by a Zod schema. Failed stages
 - **Export:** one-click PDF report generated client-side
 
 **Application**
-- Google OAuth sign-in via Auth.js v5; unsigned users get full demo access
+- Google OAuth sign-in via Auth.js v5; unauthenticated visitors get full demo access
 - Saved analyses linked to user accounts in PostgreSQL
 - Per-user monthly quota (5 live analyses) and global quota to stay within Groq's free tier
 - Community feed showing anonymized aggregate career trends
-- Dark / light mode with zero flash on load
+- Dark and light mode with zero flash on load
 
 ---
 
@@ -114,7 +114,7 @@ ascend/
 ├── app/
 │   ├── page.tsx                   Landing page
 │   ├── dashboard/page.tsx         Dashboard (5 tabs)
-│   ├── privacy/ & terms/          Legal pages
+│   ├── privacy/ + terms/          Legal pages
 │   └── api/
 │       ├── upload/                Parse PDF/DOCX, validate, extract text
 │       ├── analyze/               Groq pipeline + demo fallback + quota
@@ -153,7 +153,7 @@ ascend/
 
 ## Local setup
 
-> Requires Node.js 24. The app runs in full demo mode with no configuration.
+> Requires Node.js 22 or later. The app runs in full demo mode with no configuration.
 
 **Clone and run**
 
