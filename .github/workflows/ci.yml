@@ -47,12 +47,15 @@ jobs:
               and not f.endswith('.ttf')
               and not f.endswith('.eot')
           ]
+          em_dash   = chr(0x2014)
+          mdash_ent = '&' + 'mdash' + ';'
+          dec_ent   = '&' + '#8212' + ';'
           found = []
           for path in tracked:
               try:
                   with open(path, encoding='utf-8', errors='ignore') as fh:
                       for i, line in enumerate(fh, 1):
-                          if '—' in line or '&mdash;' in line or '&#8212;' in line:
+                          if em_dash in line or mdash_ent in line or dec_ent in line:
                               found.append(f'{path}:{i}: {line.rstrip()}')
               except (OSError, IsADirectoryError):
                   pass
