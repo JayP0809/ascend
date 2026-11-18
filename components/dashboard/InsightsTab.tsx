@@ -49,7 +49,12 @@ export function InsightsTab({ data }: InsightsTabProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <h3 className="text-sm font-semibold text-primary mb-4">Projected readiness over time</h3>
-          <ProjectionLineChart data={progressionData} startScore={startScore} />
+          <div
+            role="img"
+            aria-label={`Area chart: readiness projected to increase from ${startScore}% toward ~90% over 16 weeks following the roadmap consistently`}
+          >
+            <ProjectionLineChart data={progressionData} startScore={startScore} />
+          </div>
           <p className="text-xs text-muted mt-2">Estimated trajectory if roadmap is followed consistently</p>
         </Card>
 
@@ -58,7 +63,12 @@ export function InsightsTab({ data }: InsightsTabProps) {
             <h3 className="text-sm font-semibold text-primary">Top skills demanded in market</h3>
             <span className="text-[10px] text-muted px-1.5 py-0.5 rounded border border-border">Illustrative</span>
           </div>
-          <MarketDemandBar data={marketDemandData} />
+          <div
+            role="img"
+            aria-label="Horizontal bar chart: illustrative market demand percentages for top skills; emerald bars indicate skills you already have, gray bars indicate gaps to fill"
+          >
+            <MarketDemandBar data={marketDemandData} />
+          </div>
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5 text-xs text-secondary">
               <div className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--emerald)' }} />You have it
@@ -71,7 +81,12 @@ export function InsightsTab({ data }: InsightsTabProps) {
 
         <Card>
           <h3 className="text-sm font-semibold text-primary mb-4">Skill distribution</h3>
-          <SkillDistributionPie data={distributionData} />
+          <div
+            role="img"
+            aria-label="Pie chart: proportion of your skills broken down by Technical, Soft Skills, Tools, and Certifications categories"
+          >
+            <SkillDistributionPie data={distributionData} />
+          </div>
         </Card>
 
         <Card>

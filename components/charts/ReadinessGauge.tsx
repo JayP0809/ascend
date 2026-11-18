@@ -36,7 +36,11 @@ export function ReadinessGauge({ score, targetRole }: ReadinessGaugeProps) {
   ];
 
   return (
-    <div className="flex flex-col items-center justify-center h-full">
+    <div
+      className="flex flex-col items-center justify-center h-full"
+      role="img"
+      aria-label={`Radial gauge: ${score}% readiness for ${targetRole}`}
+    >
       <div className="relative w-52 h-52">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart

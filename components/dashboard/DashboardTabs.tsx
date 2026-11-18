@@ -26,9 +26,13 @@ export function DashboardTabs({ data }: DashboardTabsProps) {
       <div className="overflow-x-auto pb-1">
         <TabsList>
           {TABS.map(({ id, label, icon: Icon }) => (
-            <TabsTrigger key={id} value={id}>
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{label}</span>
+            <TabsTrigger
+              key={id}
+              value={id}
+              className="flex-col gap-0.5 sm:flex-row sm:gap-2 h-auto py-1.5 px-2 sm:px-4"
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="text-[10px] sm:text-sm">{label}</span>
             </TabsTrigger>
           ))}
         </TabsList>

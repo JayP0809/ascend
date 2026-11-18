@@ -85,8 +85,11 @@ export function OverviewTab({ data }: OverviewTabProps) {
 
       {/* Gauge + Skill cloud */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="flex items-center justify-center min-h-[260px]">
+        <Card className="flex flex-col items-center justify-center min-h-[260px] pb-4">
           <ReadinessGauge score={gapAnalysis.readiness_score} targetRole={analysis.targetRole} />
+          <p className="text-[11px] text-muted text-center px-5 leading-relaxed mt-1">
+            AI-generated heuristic estimate based on resume vs. role requirements. Not a statistical probability.
+          </p>
         </Card>
 
         <Card>
@@ -99,7 +102,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   onClick={() => setCategoryFilter(cat)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     categoryFilter === cat
-                      ? 'bg-accent text-white'
+                      ? 'bg-accent text-accent-fg'
                       : 'bg-background text-secondary hover:text-primary'
                   }`}
                 >
@@ -141,7 +144,12 @@ export function OverviewTab({ data }: OverviewTabProps) {
       {/* Skill gap bar chart */}
       <Card>
         <h3 className="text-sm font-semibold text-primary mb-4">Skills by category</h3>
-        <SkillGapChart categories={roleRequirements.categories} currentSkills={skillExtraction.current_skills} />
+        <div
+          role="img"
+          aria-label="Grouped bar chart: skills you currently have vs. skills the role requires, broken down by Technical, Soft Skills, Tools, and Certifications"
+        >
+          <SkillGapChart categories={roleRequirements.categories} currentSkills={skillExtraction.current_skills} />
+        </div>
       </Card>
     </div>
   );

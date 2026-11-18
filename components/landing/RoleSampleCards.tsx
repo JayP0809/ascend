@@ -33,9 +33,9 @@ const SAMPLE_TRANSITIONS = [
 
 const STATS = [
   { value: '80+', label: 'Career paths' },
-  { value: 'AI', label: 'Powered analysis' },
+  { value: '8', label: 'Phases per roadmap' },
   { value: '16wk', label: 'Roadmaps' },
-  { value: 'Free', label: 'To run locally' },
+  { value: '4', label: 'AI pipeline stages' },
 ];
 
 interface RoleSampleCardsProps {
@@ -48,7 +48,7 @@ export function RoleSampleCards({ onViewSample }: RoleSampleCardsProps) {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-primary mb-3">See what&apos;s possible</h2>
-          <p className="text-secondary">Real career transitions, mapped out step by step</p>
+          <p className="text-secondary">Sample career paths generated from fictional resumes</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">

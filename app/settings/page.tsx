@@ -24,14 +24,34 @@ export default function SettingsPage() {
   if (!session) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4 px-6">
-          <p className="text-secondary">You must be signed in to access settings.</p>
-          <Link
-            href="/sign-in?callbackUrl=/settings"
-            className="inline-block px-5 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent hover:text-white transition-colors"
-          >
-            Sign in
-          </Link>
+        <div className="max-w-sm w-full px-6 space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold text-primary mb-2">Account Settings</h1>
+            <p className="text-sm text-secondary">Sign in to view and manage your account.</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-xs font-medium text-muted">After signing in you can:</p>
+            <ul className="space-y-2">
+              {[
+                'View your account name, email, and sign-in method',
+                'Review your analysis history and saved roadmaps',
+                'Delete your account and all associated data',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm text-secondary">
+                  <span className="text-muted mt-0.5 flex-shrink-0">&#8226;</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="text-center">
+            <Link
+              href="/sign-in?callbackUrl=/settings"
+              className="inline-block px-6 py-2.5 rounded-lg bg-accent text-accent-fg text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Sign in with Google
+            </Link>
+          </div>
         </div>
       </main>
     );

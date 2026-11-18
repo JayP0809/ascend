@@ -103,7 +103,7 @@ function DashboardContent() {
             </Button>
             <Button size="sm" onClick={handleExportClick}>
               <Download className="h-4 w-4" />
-              Export PDF
+              <span className="hidden sm:inline">Export PDF</span>
             </Button>
           </>
         }
