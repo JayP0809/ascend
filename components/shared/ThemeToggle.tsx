@@ -1,6 +1,5 @@
 'use client';
 import { useTheme } from 'next-themes';
-import { Sun, Moon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
@@ -10,16 +9,39 @@ export function ThemeToggle() {
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {
-    return <div className="h-9 w-9 rounded-lg bg-background border border-border" />;
+    return <div className="h-8 w-[88px] rounded-md bg-background border border-border" />;
   }
 
+  const isDark = theme === 'dark';
+
   return (
-    <button
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="h-9 w-9 rounded-lg border border-border bg-background flex items-center justify-center text-secondary hover:text-primary hover:bg-card transition-colors"
-      aria-label="Toggle theme"
+    <div
+      className="flex items-center rounded-md border border-border overflow-hidden text-xs font-medium"
+      role="group"
+      aria-label="Color theme"
     >
-      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
+      <button
+        onClick={() => setTheme('light')}
+        className={`px-3 py-1.5 transition-colors ${
+          !isDark
+            ? 'bg-accent text-accent-fg'
+            : 'bg-background text-secondary hover:text-primary'
+        }`}
+        aria-pressed={!isDark}
+      >
+        Light
+      </button>
+      <button
+        onClick={() => setTheme('dark')}
+        className={`px-3 py-1.5 transition-colors ${
+          isDark
+            ? 'bg-accent text-accent-fg'
+            : 'bg-background text-secondary hover:text-primary'
+        }`}
+        aria-pressed={isDark}
+      >
+        Dark
+      </button>
+    </div>
   );
 }

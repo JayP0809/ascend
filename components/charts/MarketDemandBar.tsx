@@ -14,11 +14,11 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   if (!active || !payload?.length) return null;
   const hasSkill = payload[0].payload.hasSkill;
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-lg text-xs">
-      <p className="font-medium text-primary mb-1">{label}</p>
-      <p className="text-secondary">Market demand: <span className="font-semibold text-primary">{payload[0].value}%</span></p>
+    <div className="rounded border p-2.5 text-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
+      <p className="font-medium mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
+      <p style={{ color: 'var(--text-secondary)' }}>Demand: <span style={{ color: 'var(--text-primary)' }}>{payload[0].value}%</span></p>
       <p style={{ color: hasSkill ? 'var(--emerald-text)' : 'var(--text-muted)' }}>
-        {hasSkill ? '✓ You have this skill' : '○ Gap to fill'}
+        {hasSkill ? 'Skill you have' : 'Skill to develop'}
       </p>
     </div>
   );
@@ -26,17 +26,19 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export function MarketDemandBar({ data }: MarketDemandBarProps) {
   const { theme } = useTheme();
-  const [colors, setColors] = useState({ text: '#56575C', grid: '#35363A', emerald: '#5F7A68', muted: '#35363A' });
+  const [colors, setColors] = useState({ text: '#A09880', grid: 'rgba(30,26,22,0.09)', emerald: '#1D5C3A', gap: '#D4CBBF' });
 
   useEffect(() => {
-    const root = document.documentElement;
-    const style = getComputedStyle(root);
-    setColors({
-      text: style.getPropertyValue('--text-muted').trim() || '#56575C',
-      grid: style.getPropertyValue('--border').trim() || '#35363A',
-      emerald: style.getPropertyValue('--emerald').trim() || '#5F7A68',
-      muted: style.getPropertyValue('--border').trim() || '#35363A',
+    const frame = requestAnimationFrame(() => {
+      const style = getComputedStyle(document.documentElement);
+      setColors({
+        text:    style.getPropertyValue('--text-muted').trim()    || '#A09880',
+        grid:    style.getPropertyValue('--border').trim()        || 'rgba(30,26,22,0.09)',
+        emerald: style.getPropertyValue('--emerald').trim()       || '#1D5C3A',
+        gap:     style.getPropertyValue('--border-strong').trim() || '#D4CBBF',
+      });
     });
+    return () => cancelAnimationFrame(frame);
   }, [theme]);
 
   return (
@@ -62,7 +64,7 @@ export function MarketDemandBar({ data }: MarketDemandBarProps) {
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey="demand" radius={[0, 4, 4, 0]} animationDuration={800}>
           {data.map((entry, i) => (
-            <Cell key={i} fill={entry.hasSkill ? colors.emerald : colors.muted} />
+            <Cell key={i} fill={entry.hasSkill ? colors.emerald : colors.gap} />
           ))}
         </Bar>
       </BarChart>

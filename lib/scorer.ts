@@ -100,7 +100,7 @@ export function buildMarketDemandData(analysis: AnalysisResult): { skill: string
   }));
 }
 
-export function buildDistributionData(items: SkillGapItem[]): { name: string; value: number; color: string }[] {
+export function buildDistributionData(items: SkillGapItem[]): { name: string; value: number; color: string; count: number }[] {
   const counts = { technical: 0, soft: 0, tools: 0, certifications: 0 };
   for (const item of items) {
     if (item.category in counts) counts[item.category as keyof typeof counts]++;
@@ -108,10 +108,10 @@ export function buildDistributionData(items: SkillGapItem[]): { name: string; va
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
   return [
-    { name: 'Technical', value: Math.round((counts.technical / total) * 100), color: '#C8C9CD' },
-    { name: 'Soft Skills', value: Math.round((counts.soft / total) * 100), color: '#7B7D84' },
-    { name: 'Tools', value: Math.round((counts.tools / total) * 100), color: '#5F7A68' },
-    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#B7A07A' },
+    { name: 'Technical',      value: Math.round((counts.technical      / total) * 100), color: '#C8C9CD', count: counts.technical },
+    { name: 'Soft Skills',    value: Math.round((counts.soft           / total) * 100), color: '#7B7D84', count: counts.soft },
+    { name: 'Tools',          value: Math.round((counts.tools          / total) * 100), color: '#5F7A68', count: counts.tools },
+    { name: 'Certifications', value: Math.round((counts.certifications / total) * 100), color: '#B7A07A', count: counts.certifications },
   ].filter((d) => d.value > 0);
 }
 

@@ -81,7 +81,7 @@ function normalizeResourceType(raw: string): ResourceType {
 // renders correctly regardless of model output variation.
 export const ResourceSchema = z.object({
   title: z.string().min(1),
-  url: z.string().url(),
+  url: z.string().url().refine((u) => u.startsWith('https://'), { message: 'Resource URL must use HTTPS' }),
   type: z.string().min(1).transform(normalizeResourceType),
 });
 

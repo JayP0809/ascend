@@ -14,25 +14,28 @@ interface ProjectionLineChartProps {
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string | number }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-lg text-xs">
-      <p className="text-secondary mb-1">Week {label}</p>
-      <p className="font-semibold text-primary">{payload[0].value}% ready</p>
+    <div className="rounded border p-2.5 text-xs" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
+      <p className="mb-1" style={{ color: 'var(--text-secondary)' }}>Week {label}</p>
+      <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{payload[0].value}% ready</p>
     </div>
   );
 };
+
 
 export function ProjectionLineChart({ data, startScore: _startScore }: ProjectionLineChartProps) {
   const { theme } = useTheme();
   const [colors, setColors] = useState({ text: '#56575C', grid: '#35363A', accent: '#C6C7CC' });
 
   useEffect(() => {
-    const root = document.documentElement;
-    const style = getComputedStyle(root);
-    setColors({
-      text: style.getPropertyValue('--text-muted').trim() || '#56565E',
-      grid: style.getPropertyValue('--border').trim() || '#2C2C31',
-      accent: style.getPropertyValue('--accent').trim() || '#E07A5F',
+    const frame = requestAnimationFrame(() => {
+      const style = getComputedStyle(document.documentElement);
+      setColors({
+        text: style.getPropertyValue('--text-muted').trim() || '#56565E',
+        grid: style.getPropertyValue('--border').trim() || '#2C2C31',
+        accent: style.getPropertyValue('--accent').trim() || '#E07A5F',
+      });
     });
+    return () => cancelAnimationFrame(frame);
   }, [theme]);
 
   return (
@@ -60,7 +63,11 @@ export function ProjectionLineChart({ data, startScore: _startScore }: Projectio
           tickFormatter={(v) => `${v}%`}
         />
         <Tooltip content={<CustomTooltip />} />
-        <ReferenceLine x={0} stroke={colors.accent} strokeDasharray="4 4" label={{ value: 'Now', fill: colors.text, fontSize: 10 }} />
+        <ReferenceLine
+          x={0}
+          stroke={colors.accent}
+          strokeDasharray="4 4"
+        />
         <Area
           type="monotone"
           dataKey="readiness"

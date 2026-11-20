@@ -922,7 +922,7 @@ describe.skipIf(!HAS_DB)('[integration] global quota: atomic reservation in glob
   // so the tests pass but skip the enforcement assertions.
 
   it('concurrent requests all receive a slot when under the limit', async () => {
-    const { reserveGlobalQuotaSlot } = await import('./quota');
+    const { reserveGlobalQuotaSlot, refundGlobalQuotaSlot } = await import('./quota');
     const limit = 10;
     const concurrent = 5;
 
@@ -933,6 +933,10 @@ describe.skipIf(!HAS_DB)('[integration] global quota: atomic reservation in glob
     // All should be allowed when under the limit
     const allowed = results.filter((r) => r.allowed).length;
     expect(allowed).toBe(concurrent);
+
+    // Refund every reserved slot so repeated runs start from the same bucket state.
+    // The other global quota tests already follow this pattern.
+    await Promise.all(results.filter((r) => r.allowed).map(() => refundGlobalQuotaSlot()));
   });
 
   it('requests beyond the global limit are denied', async () => {
@@ -1157,7 +1161,7 @@ describe('account deletion: authorization (documented, requires live auth)', () 
 
 describe.skipIf(!HAS_DB)('[integration] account deletion: cascading data removal', () => {
   it('deleting a user removes associated analyses and usage records', async () => {
-    const { upsertUser, saveAnalysis, deleteUser, getUserAnalyses } = await import('./db');
+    const { upsertUser, saveAnalysis, deleteUser, getUserAnalyses, getAnalysis } = await import('./db');
     const { reserveQuotaSlot } = await import('./quota');
 
     const providerId = `provider_delete_${Date.now()}`;
@@ -1170,14 +1174,23 @@ describe.skipIf(!HAS_DB)('[integration] account deletion: cascading data removal
     // Reserve a quota slot so there is a usage_buckets row to cascade
     await reserveQuotaSlot(userId, false);
 
-    // Verify data exists
-    const analysesBefore = await getUserAnalyses(userId);
-    expect(analysesBefore.length).toBeGreaterThan(0);
+    // Verify the analysis exists before deletion.
+    // getAnalysis fetches any status (not filtered like getUserAnalyses), so it
+    // correctly sees the pending row created by saveAnalysis. Migration 0002
+    // changed getUserAnalyses to return only status='complete' rows; using it
+    // here would return 0 for a freshly saved pending analysis.
+    const analysisBefore = await getAnalysis(analysisId);
+    expect(analysisBefore).not.toBeNull();
+    expect(analysisBefore!.id).toBe(analysisId);
 
     // Delete the user
     await deleteUser(userId);
 
-    // Analyses should be gone (FK cascade)
+    // The specific analysis row must be gone (FK cascade: users -> analyses)
+    const analysisAfter = await getAnalysis(analysisId);
+    expect(analysisAfter).toBeNull();
+
+    // getUserAnalyses also returns 0 for the deleted user
     const analysesAfter = await getUserAnalyses(userId);
     expect(analysesAfter.length).toBe(0);
   });

@@ -142,5 +142,5 @@ export interface DashboardData {
   skillGapItems: SkillGapItem[];
   progressionData: { week: number; readiness: number }[];
   marketDemandData: { skill: string; demand: number; hasSkill: boolean }[];
-  distributionData: { name: string; value: number; color: string }[];
+  distributionData: { name: string; value: number; color: string; count: number }[];
 }
