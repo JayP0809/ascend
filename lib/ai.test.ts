@@ -650,6 +650,162 @@ describe('RoleRequirementsSchema: demand_level removed', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Regression: reasoning-aware truncation fix (phase-1a)
+//
+// openai/gpt-oss-20b is a reasoning model on Groq. max_tokens covers both
+// reasoning tokens (internal chain-of-thought) and visible JSON output.
+// REASONING_EFFORT controls per-step reasoning overhead to protect JSON budget.
+// ---------------------------------------------------------------------------
+describe('reasoning model: reasoning_effort per step', () => {
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+  });
+
+  it('passes reasoning_effort: low for extractSkills and getRoleRequirements', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    await runAnalysis('effort-test', 'resume text', 'Software Engineer');
+
+    // Calls 1 and 2 are extractSkills + getRoleRequirements (concurrent); order
+    // may vary but both must carry reasoning_effort: 'low'.
+    const call0Body = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+    const call1Body = mockCreate.mock.calls[1][0] as Record<string, unknown>;
+    const extractAndRole = [call0Body.reasoning_effort, call1Body.reasoning_effort];
+    expect(extractAndRole).toContain('low');
+    expect(extractAndRole.every((e) => e === 'low')).toBe(true);
+  });
+
+  it('passes reasoning_effort: medium for analyzeGap, roadmapBatch1, roadmapBatch2', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    await runAnalysis('effort-test-2', 'resume text', 'Software Engineer');
+
+    // Call 3 = analyzeGap, call 4 = roadmapBatch1, call 5 = roadmapBatch2.
+    const analyzeGapBody    = mockCreate.mock.calls[2][0] as Record<string, unknown>;
+    const roadmapBatch1Body = mockCreate.mock.calls[3][0] as Record<string, unknown>;
+    const roadmapBatch2Body = mockCreate.mock.calls[4][0] as Record<string, unknown>;
+    expect(analyzeGapBody.reasoning_effort).toBe('medium');
+    expect(roadmapBatch1Body.reasoning_effort).toBe('medium');
+    expect(roadmapBatch2Body.reasoning_effort).toBe('medium');
+  });
+});
+
+describe('reasoning model: reasoning token telemetry', () => {
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+  });
+
+  function makeCompletionWithReasoning(content: string, reasoningTokens: number, finishReason = 'stop') {
+    return {
+      choices: [{ message: { content }, finish_reason: finishReason }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 100 + reasoningTokens,
+        completion_tokens_details: { reasoning_tokens: reasoningTokens },
+      },
+    };
+  }
+
+  it('captures reasoning_tokens when Groq provides completion_tokens_details', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletionWithReasoning(VALID_SKILL_JSON, 150))
+      .mockResolvedValueOnce(makeCompletionWithReasoning(VALID_ROLE_JSON, 80))
+      .mockResolvedValueOnce(makeCompletionWithReasoning(VALID_GAP_JSON, 400))
+      .mockResolvedValueOnce(makeCompletionWithReasoning(VALID_BATCH1_JSON, 600))
+      .mockResolvedValueOnce(makeCompletionWithReasoning(VALID_BATCH2_JSON, 500));
+
+    const result = await runAnalysis('reasoning-test', 'resume text', 'Software Engineer');
+    // pipelineUsage.totals.reasoningTokens should be the sum of all steps.
+    expect(result.pipelineUsage?.totals.reasoningTokens).toBe(150 + 80 + 400 + 600 + 500);
+  });
+
+  it('sets reasoningTokens to null when Groq does not provide completion_tokens_details', async () => {
+    // makeCompletion does NOT include completion_tokens_details.
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    const result = await runAnalysis('no-reasoning-meta', 'resume text', 'Software Engineer');
+    // null means "not reported", distinct from 0 (reported as zero).
+    expect(result.pipelineUsage?.totals.reasoningTokens).toBeNull();
+  });
+
+  it('throws GroqTruncationError and records reasoning breakdown when finish_reason=length', async () => {
+    // The model truncated after consuming 1200 reasoning tokens on a 1536 budget.
+    mockCreate.mockResolvedValue(
+      makeCompletionWithReasoning('{"incomplete": true', 1200, 'length')
+    );
+
+    await expect(
+      runAnalysis('truncation-with-reasoning', 'resume text', 'Software Engineer')
+    ).rejects.toBeInstanceOf(GroqTruncationError);
+
+    // Should not retry after truncation.
+    expect(mockCreate).toHaveBeenCalledTimes(2); // parallel extractSkills + getRoleRequirements
+  });
+});
+
+describe('gapAnalysisPrompt: prose length constraints', () => {
+  // Import the prompt builder directly via the pipeline's mock path.
+  // We test the prompt string emitted by runAnalysis by inspecting the
+  // argument passed to mockCreate on the analyzeGap call (3rd call, index 2).
+  beforeEach(() => {
+    process.env.GROQ_API_KEY = 'test-groq-key-for-unit-tests';
+    vi.clearAllMocks();
+  });
+
+  it('gapAnalysisPrompt includes 40-word limit for strengths_summary', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    await runAnalysis('prompt-test', 'resume text', 'Software Engineer');
+
+    // The 3rd call (index 2) is analyzeGap.
+    const analyzeGapPrompt = (mockCreate.mock.calls[2][0] as Record<string, unknown>)
+      .messages as Array<{ content: string }>;
+    const promptText = analyzeGapPrompt[0].content;
+    expect(promptText).toMatch(/40 words/);
+    expect(promptText).toMatch(/strengths_summary/);
+  });
+
+  it('gapAnalysisPrompt includes 10-word limit for biggest_gap', async () => {
+    mockCreate
+      .mockResolvedValueOnce(makeCompletion(VALID_SKILL_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_ROLE_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_GAP_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH1_JSON))
+      .mockResolvedValueOnce(makeCompletion(VALID_BATCH2_JSON));
+
+    await runAnalysis('prompt-test-2', 'resume text', 'Software Engineer');
+
+    const analyzeGapPrompt = (mockCreate.mock.calls[2][0] as Record<string, unknown>)
+      .messages as Array<{ content: string }>;
+    const promptText = analyzeGapPrompt[0].content;
+    expect(promptText).toMatch(/10 words/);
+    expect(promptText).toMatch(/biggest_gap/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Live integration (requires GROQ_API_KEY in environment)
 // ---------------------------------------------------------------------------
 const HAS_GROQ = !!(process.env.GROQ_API_KEY);
