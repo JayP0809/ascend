@@ -375,7 +375,7 @@ export function ExportTab({ data }: ExportTabProps) {
         style={{
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderRadius: 3,
+          borderRadius: 20,
           padding: '20px 24px',
           marginBottom: 16,
         }}

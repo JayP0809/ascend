@@ -358,15 +358,15 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
             top: '100%',
             left: 0,
             right: 0,
-            marginTop: 6,
+            marginTop: 8,
             background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 4,
+            border: '1px solid var(--border)',
+            borderRadius: 20,
             boxShadow: 'var(--shadow-lg)',
             zIndex: 50,
             listStyle: 'none',
-            padding: '4px 0',
-            maxHeight: 240,
+            padding: '6px',
+            maxHeight: 260,
             overflowY: 'auto',
           }}
         >
@@ -383,12 +383,13 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
               }}
               onMouseEnter={() => setActiveIdx(i)}
               style={{
-                padding: '9px 14px',
+                padding: '10px 14px',
                 fontSize: 14,
                 cursor: 'pointer',
+                borderRadius: 12,
                 color: i === activeIdx ? 'var(--text-primary)' : 'var(--text-secondary)',
                 background: i === activeIdx ? 'var(--accent-light)' : 'transparent',
-                transition: 'background 0.07s',
+                transition: 'background 0.08s',
               }}
             >
               {s.title}

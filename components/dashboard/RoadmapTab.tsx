@@ -195,7 +195,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                           href={r.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-3 py-2.5 px-3 rounded border group transition-colors"
+                          className="flex items-center gap-3 py-2.5 px-3 rounded-xl border group transition-colors"
                           style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
                           onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border-strong)'; }}
                           onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)'; }}
@@ -224,7 +224,7 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
                       Project
                     </p>
                     <div
-                      className="p-4 rounded border"
+                      className="p-4 rounded-2xl border"
                       style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
                     >
                       <div className="flex items-start justify-between gap-4 mb-2">

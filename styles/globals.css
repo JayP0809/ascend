@@ -173,15 +173,16 @@ textarea {
 .hero-input-wrap {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border-strong);
-  padding-bottom: 14px;
-  padding-top: 4px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 36px;
+  padding: 14px 20px;
   transition: border-color 0.2s ease;
   cursor: text;
 }
 
 .hero-input-wrap:focus-within {
-  border-color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .hero-cursor {
@@ -214,14 +215,24 @@ textarea {
   border: none;
   outline: none;
   font-family: var(--font-inter), system-ui, sans-serif;
-  font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   caret-color: var(--text-primary);
   padding: 0;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .hero-text-input {
+    font-size: 0.875rem;
+  }
 }
 
 .hero-text-input::placeholder {
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  font-weight: 400;
 }
 
 /* ── Urgency legend ─────────────────────────────────────────────────────────── */

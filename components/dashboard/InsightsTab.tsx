@@ -23,8 +23,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function ChartBox({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="rounded p-4"
-      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+      className="p-4"
+      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 20 }}
     >
       {children}
     </div>
