@@ -238,7 +238,7 @@ export async function getUserAnalyses(
       .orderBy(desc(analyses.createdAt))
       .limit(limit);
   } catch {
-    // Pre-migration fallback: status column not yet present — filter by
+    // Pre-migration fallback: status column not yet present; filter by
     // result_json instead so callers still get only completed analyses.
     return db
       .select({

@@ -12,7 +12,7 @@ import { AnalysisResult, GapAnalysis, RoleRequirements, RoadmapWeek } from './ty
 import { searchRoles } from './roles';
 
 // ---------------------------------------------------------------------------
-// Fictional candidate — constant across all sample analyses
+// Fictional candidate: constant across all sample analyses
 // ---------------------------------------------------------------------------
 const FICTIONAL_CANDIDATE = {
   current_skills: [

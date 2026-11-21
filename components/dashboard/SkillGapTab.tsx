@@ -165,7 +165,7 @@ function UrgencyLegend() {
         Development urgency
       </p>
 
-      {/* Gradient bar — outer div provides a larger touch/click target while inner div is the visible strip */}
+      {/* Gradient bar: outer div provides a larger touch/click target while inner div is the visible strip */}
       <div
         ref={barRef}
         className="urgency-bar relative cursor-pointer select-none"
@@ -199,7 +199,7 @@ function UrgencyLegend() {
         </div>
       </div>
 
-      {/* Description area — fixed height prevents layout shift */}
+      {/* Description area: fixed height prevents layout shift */}
       <div className="mt-2.5" style={{ minHeight: 36 }}>
         {category ? (
           <p
@@ -248,7 +248,7 @@ function SkillRow({ skill }: { skill: SkillGapItem }) {
         )}
       </div>
 
-      {/* Category label — hidden on mobile to keep rows compact */}
+      {/* Category label: hidden on mobile to keep rows compact */}
       <span
         className="text-xs whitespace-nowrap hidden sm:block flex-shrink-0"
         style={{ color: 'var(--text-muted)' }}

@@ -39,7 +39,7 @@ describe('fired.current deduplication guard', () => {
   it('runs the effect exactly once when called twice (Strict Mode simulation)', () => {
     const { run, getCallCount } = makeDeduplicationGuard();
     run(); // first mount
-    run(); // Strict Mode remount — should be a no-op
+    run(); // Strict Mode remount: should be a no-op
     expect(getCallCount()).toBe(1);
   });
 
@@ -99,7 +99,7 @@ describe('isMounted.current callback suppression', () => {
   it('leaves isMounted false after real unmount (no remount)', () => {
     const mount = makeMountGuard(true);
 
-    // Real unmount — no subsequent remount
+    // Real unmount; no subsequent remount
     mount.setMounted(false);
 
     expect(mount.current).toBe(false);

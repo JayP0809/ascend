@@ -142,7 +142,7 @@ describe('DELETE endpoint: request body validation', () => {
 describe('deleteAnalysis: ownership enforcement contract', () => {
   // With no DB available, both return false. The important invariant is that
   // the function signature requires a userId, which the route always supplies
-  // from the JWT session — never from the browser request body. When a real
+  // from the JWT session, never from the browser request body. When a real
   // DB is present, the WHERE id=? AND user_id=? clause returns 0 rows for a
   // mismatched userId, and the function returns false.
 

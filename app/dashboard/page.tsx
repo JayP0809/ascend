@@ -330,7 +330,7 @@ function SavedView({ currentAnalysisId }: SavedViewProps) {
             )}
           </Link>
 
-          {/* Delete button — discreet, opens confirmation */}
+          {/* Delete button: discreet, opens confirmation */}
           <button
             onClick={() => { setConfirmDeleteId(entry.id); setDeleteError(null); }}
             aria-label={`Delete analysis for ${entry.target_role}`}

@@ -4,8 +4,8 @@
  * Bug reproduced: a signed-in user clicks "New Analysis" (/?new=1). The first
  * effect run sees ?new=1, clears the URL with replaceState, and sets
  * resumeCheckDone=true. When sessionStatus changes from 'loading' to
- * 'authenticated', the effect re-fires. At that point the URL is '/' — no
- * ?new=1 — so the original bypass check missed and auto-resume redirected
+ * 'authenticated', the effect re-fires. At that point the URL is '/' (no
+ * ?new=1), so the original bypass check missed and auto-resume redirected
  * the user back to their newest saved analysis.
  *
  * Fix: a ref (newAnalysisRef) set when ?new=1 is first detected. Subsequent

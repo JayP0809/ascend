@@ -4,7 +4,7 @@ import { DEMO_ANALYSIS_ID, DEMO_ID_REGEX } from './constants';
 describe('DEMO_ANALYSIS_ID', () => {
   it('matches the API schema regex from analyzeBodySchema', () => {
     // The POST /api/analyze route accepts demo IDs only when they satisfy
-    // /^demo-[a-z0-9-]+$/i — keeping these in sync is a hard contract.
+    // /^demo-[a-z0-9-]+$/i - keeping these in sync is a hard contract.
     expect(DEMO_ID_REGEX.test(DEMO_ANALYSIS_ID)).toBe(true);
   });
 

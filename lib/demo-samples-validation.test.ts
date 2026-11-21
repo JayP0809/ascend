@@ -31,7 +31,7 @@ const SUPPORTED_ROLES: Array<{ query: string; expectedTitle: string }> = [
   { query: 'Growth Engineer',           expectedTitle: 'Growth Hacker' },
 ];
 
-describe('buildDemoAnalysis — schema validation for all 19 supported roles', () => {
+describe('buildDemoAnalysis: schema validation for all 19 supported roles', () => {
   for (const { query, expectedTitle } of SUPPORTED_ROLES) {
     describe(`role: "${query}"`, () => {
       const result = buildDemoAnalysis('schema-test', query);

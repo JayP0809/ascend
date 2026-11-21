@@ -144,7 +144,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
           </p>
         </div>
 
-        {/* Stats container — gap trick creates the column dividers automatically */}
+        {/* Stats container: gap trick creates the column dividers automatically */}
         <div
           className="grid grid-cols-2 sm:grid-cols-4"
           style={{
@@ -178,7 +178,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
         </div>
       </div>
 
-      {/* Your Current Skills — below stats, no card wrapper */}
+      {/* Your Current Skills (below stats, no card wrapper) */}
       {ownedSkills.length > 0 && (
         <div style={{ marginTop: 40 }}>
           {/* Section heading */}

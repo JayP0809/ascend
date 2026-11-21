@@ -54,7 +54,7 @@ function simulateDeleteAll(config: RouteConfig): RouteResponse {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('DELETE /api/user/analyses/all — authentication & mode guards', () => {
+describe('DELETE /api/user/analyses/all: authentication & mode guards', () => {
   it('returns 403 when AUTH_CONFIGURED is false (demo mode)', () => {
     const res = simulateDeleteAll({
       authConfigured: false,
@@ -76,7 +76,7 @@ describe('DELETE /api/user/analyses/all — authentication & mode guards', () =>
   });
 
   it('requires auth even when AUTH_CONFIGURED is true', () => {
-    // Calling without a session always gives 401 — the check is not short-circuited
+    // Calling without a session always gives 401; the check is not short-circuited
     // by the demo-mode guard going in the other direction.
     const res = simulateDeleteAll({
       authConfigured: true,
@@ -87,7 +87,7 @@ describe('DELETE /api/user/analyses/all — authentication & mode guards', () =>
   });
 });
 
-describe('DELETE /api/user/analyses/all — successful deletion', () => {
+describe('DELETE /api/user/analyses/all: successful deletion', () => {
   it('returns 204 when the user has analyses', () => {
     const res = simulateDeleteAll({
       authConfigured: true,
@@ -109,7 +109,7 @@ describe('DELETE /api/user/analyses/all — successful deletion', () => {
     expect(res.status).toBe(204);
   });
 
-  it('is idempotent — a second call returns 204', () => {
+  it('is idempotent: a second call returns 204', () => {
     const config: RouteConfig = {
       authConfigured: true,
       currentUser: { userId: 'u1', email: 'user@example.com' },
@@ -122,7 +122,7 @@ describe('DELETE /api/user/analyses/all — successful deletion', () => {
   });
 });
 
-describe('DELETE /api/user/analyses/all — database error handling', () => {
+describe('DELETE /api/user/analyses/all: database error handling', () => {
   it('returns 500 and an error message when the DB throws', () => {
     const res = simulateDeleteAll({
       authConfigured: true,
@@ -144,7 +144,7 @@ describe('DELETE /api/user/analyses/all — database error handling', () => {
   });
 });
 
-describe('DELETE /api/user/analyses/all — ownership isolation', () => {
+describe('DELETE /api/user/analyses/all: ownership isolation', () => {
   it('resolves the user ID from the session, not the request body', () => {
     // This test verifies the route signature: the only user identity used is
     // the one from getCurrentUser(). We simulate two different authenticated
@@ -155,7 +155,7 @@ describe('DELETE /api/user/analyses/all — ownership isolation', () => {
     const resA = simulateDeleteAll({ authConfigured: true, currentUser: userA, dbDeleteResult: 'ok' });
     const resB = simulateDeleteAll({ authConfigured: true, currentUser: userB, dbDeleteResult: 'ok' });
 
-    // Both succeed independently — neither affects the other's scope.
+    // Both succeed independently; neither affects the other's scope.
     expect(resA.status).toBe(204);
     expect(resB.status).toBe(204);
   });
@@ -172,7 +172,7 @@ describe('DELETE /api/user/analyses/all — ownership isolation', () => {
   });
 });
 
-describe('DELETE /api/user/analyses/all — UI confirmation invariants', () => {
+describe('DELETE /api/user/analyses/all: UI confirmation invariants', () => {
   // These tests verify the confirmation-dialog contract purely in logic.
   // The dialog is in app/dashboard/page.tsx (SavedView).
 

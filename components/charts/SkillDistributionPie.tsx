@@ -50,7 +50,7 @@ export function SkillDistributionPie({ data }: SkillDistributionPieProps) {
           <Tooltip content={<CustomTooltip />} />
         </PieChart>
       </ResponsiveContainer>
-      {/* Legend below chart — theme-adaptive text */}
+      {/* Legend below chart: theme-adaptive text */}
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 mt-2">
         {data.map((entry) => (
           <div key={entry.name} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>

@@ -24,7 +24,7 @@ export default function SettingsPage() {
         if (k?.startsWith('roadmap-complete-')) keysToRemove.push(k);
       }
       keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch { /* ignore — localStorage unavailable in some contexts */ }
+    } catch { /* ignore: localStorage unavailable in some contexts */ }
     await signOut({ callbackUrl: '/' });
   }
 

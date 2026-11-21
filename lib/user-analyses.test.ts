@@ -108,8 +108,8 @@ const otherUserRow = makeRow({ id: 'b1', user_id: 'user-b' });
 
 // ── Tests: primary path (status column exists) ────────────────────────────────
 
-describe('getUserAnalyses — primary path (status = complete filter)', () => {
-  it('excludes pending rows — the root-cause scenario', () => {
+describe('getUserAnalyses: primary path (status = complete filter)', () => {
+  it('excludes pending rows: the root-cause scenario', () => {
     // Before the fix: pendingNew was newest so it would be analyses[0].
     // After the fix: only completedA and completedB are returned.
     const rows = [completedA, completedB, pendingNew];
@@ -162,7 +162,7 @@ describe('getUserAnalyses — primary path (status = complete filter)', () => {
 
 // ── Tests: pre-migration fallback (no status column) ─────────────────────────
 
-describe('getUserAnalyses — pre-migration fallback (result_json filter)', () => {
+describe('getUserAnalyses: pre-migration fallback (result_json filter)', () => {
   it('excludes rows with empty result_json (pending/failed)', () => {
     const rows = [completedA, pendingNew, failedNew];
     const result = simulateGetUserAnalyses(rows, 'user-a', 10, false);
@@ -177,7 +177,7 @@ describe('getUserAnalyses — pre-migration fallback (result_json filter)', () =
 
 // ── Tests: auto-resume selection (simulates app/page.tsx) ────────────────────
 
-describe('auto-resume — analyses[0] is always a completed analysis after fix', () => {
+describe('auto-resume: analyses[0] is always a completed analysis after fix', () => {
   it('the fixed auto-resume redirects to the newest COMPLETE analysis', () => {
     // This is the exact scenario that caused the bug.
     // User has: completed Jan 1, completed Jan 2, then started (but abandoned)
@@ -185,8 +185,8 @@ describe('auto-resume — analyses[0] is always a completed analysis after fix',
     const rows = [completedA, completedB, pendingNew];
     const returned = simulateGetUserAnalyses(rows, 'user-a');
 
-    // Before fix: returned[0].id === 'a3' (pending — would show error)
-    // After fix:  returned[0].id === 'a2' (complete — works correctly)
+    // Before fix: returned[0].id === 'a3' (pending: would show error)
+    // After fix:  returned[0].id === 'a2' (complete: works correctly)
     expect(returned.length).toBeGreaterThan(0);
     expect(returned[0].id).toBe('a2'); // newest complete
     expect(returned[0].id).not.toBe('a3'); // NOT the pending row

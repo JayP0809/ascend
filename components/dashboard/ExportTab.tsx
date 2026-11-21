@@ -80,7 +80,7 @@ export function ExportTab({ data }: ExportTabProps) {
         if (y + need > CB) { doc.addPage(); return 24; }
         return y;
       };
-      // Section eyebrow — thin rule then label; returns y after label
+      // Section eyebrow: thin rule then label; returns y after label
       const secLbl = (text: string, y: number): number => {
         rule(y);
         sf('bold', 7.5); sc(C.muted);

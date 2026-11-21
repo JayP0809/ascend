@@ -15,7 +15,7 @@ const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true';
 type Step = 'question' | 'resume' | 'resume-preview' | 'analyzing';
 
 // Cycling messages shown during analysis.
-// These describe what the AI pipeline is working on — they are NOT sequential
+// These describe what the AI pipeline is working on; they are NOT sequential
 // confirmed stages. The backend is a single POST that runs everything at once.
 // Messages cycle on a timer purely to show activity, not backend progress.
 const CYCLE_MESSAGES = [
@@ -27,7 +27,7 @@ const CYCLE_MESSAGES = [
 
 // ── Analyzing view ────────────────────────────────────────────────────────────
 // Fires POST /api/analyze once on mount. Cycles through messages on a timer
-// to show activity — these do NOT reflect confirmed backend sub-steps.
+// to show activity; these do NOT reflect confirmed backend sub-steps.
 function AnalyzingView({
   analysisId,
   targetRole,
@@ -189,7 +189,7 @@ function AnalyzingView({
           Usually 15–30 seconds
         </p>
 
-        {/* Single cycling message — framed as ongoing activity, not confirmed stages. */}
+        {/* Single cycling message, framed as ongoing activity, not confirmed stages. */}
         <p
           className="text-sm"
           style={{ color: 'var(--text-secondary)' }}
@@ -216,11 +216,11 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
   const suppressNextSuggestionsRef = useRef(false);
   const canSubmit = value.trim().length > 0;
 
-  // Auto-focus on mount — desktop only.
+  // Auto-focus on mount (desktop only).
   // useLayoutEffect fires synchronously after DOM commit, before browser paint.
   // This is the same lifecycle phase React uses internally for the autoFocus
-  // prop. Running here (rather than useEffect) means nothing async — theme
-  // initialization, session loading, or other effects — can steal focus between
+  // prop. Running here (rather than useEffect) means nothing async (theme
+  // initialization, session loading, or other effects) can steal focus between
   // the DOM commit and our focus call.
   // The autoFocus prop below is kept as an additional layer for the SSR/hydration
   // path where the browser handles autofocus from the initial HTML.
@@ -243,7 +243,7 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       // Only single-character printable keys (excludes Tab, Enter, Escape, arrows, etc.).
       if (e.key.length !== 1) return;
-      // Input already has focus — nothing to redirect.
+      // Input already has focus; nothing to redirect.
       if (document.activeElement === inputRef.current) return;
       // Never steal from another text field or editable element.
       const active = document.activeElement as HTMLElement | null;
@@ -324,7 +324,7 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Underline input row — has-value class drives cursor/caret visibility via globals.css */}
+      {/* Underline input row: has-value class drives cursor/caret visibility via globals.css */}
       <div
         className={`hero-input-wrap${value ? ' has-value' : ''}`}
         onClick={() => inputRef.current?.focus()}
@@ -398,7 +398,7 @@ function QuestionInput({ onSubmit }: { onSubmit: (role: string) => void }) {
         </ul>
       )}
 
-      {/* Hint — fades in once the user has typed a role */}
+      {/* Hint: fades in once the user has typed a role */}
       <div className="mt-4">
         <p
           className="text-sm"
@@ -490,23 +490,23 @@ export default function HomePage() {
       return;
     }
 
-    // ?step=preview: sample preview flow — skip auto-resume.
+    // ?step=preview: sample preview flow; skip auto-resume.
     if (params.get('step') === 'preview') {
       setResumeCheckDone(true);
       return;
     }
 
-    // Auth not yet resolved — hold the loading screen and wait for the next
+    // Auth not yet resolved: hold the loading screen and wait for the next
     // render when sessionStatus changes. Do NOT set resumeCheckDone here.
     if (AUTH_ENABLED && sessionStatus === 'loading') return;
 
-    // Signed out or auth disabled — show the landing page immediately.
+    // Signed out or auth disabled: show the landing page immediately.
     if (!AUTH_ENABLED || sessionStatus === 'unauthenticated') {
       setResumeCheckDone(true);
       return;
     }
 
-    // Authenticated — fetch this user's analyses and redirect to the newest.
+    // Authenticated: fetch this user's analyses and redirect to the newest.
     let cancelled = false;
     async function tryResume() {
       try {

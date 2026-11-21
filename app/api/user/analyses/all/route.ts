@@ -7,7 +7,7 @@ import { deleteUserAnalyses } from '@/lib/db';
  *
  * Permanently deletes every analysis owned by the authenticated user.
  * The user ID is resolved exclusively from the Auth.js JWT session cookie
- * via getCurrentUser() — it is never accepted from the request body or URL.
+ * via getCurrentUser(). It is never accepted from the request body or URL.
  *
  * Cascade effects (via FK constraints):
  *   skill_records, ai_usage, roadmap_phases → cascade-deleted

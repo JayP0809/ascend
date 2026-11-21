@@ -141,7 +141,7 @@ describe('buildDemoAnalysis', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Cybersecurity Analyst — partial query and alias matching
+  // Cybersecurity Analyst: partial query and alias matching
   // -------------------------------------------------------------------------
   it('"cyber" partial match resolves to Cybersecurity Analyst', () => {
     const result = buildDemoAnalysis('d10', 'cyber');
@@ -193,7 +193,7 @@ describe('buildDemoAnalysis', () => {
   });
 
   // -------------------------------------------------------------------------
-  // No Groq calls, no DB writes — structural guarantees
+  // No Groq calls, no DB writes: structural guarantees
   // -------------------------------------------------------------------------
   it('returns a result synchronously (no async)', () => {
     const result = buildDemoAnalysis('d1', 'DevOps Engineer');
