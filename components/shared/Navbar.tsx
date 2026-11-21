@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { ThemeToggle } from './ThemeToggle';
 import { NavAuthButtons } from './NavAuthButtons';
-import { TrendingUp } from 'lucide-react';
 
 interface NavbarProps {
   breadcrumb?: string;
@@ -11,23 +10,31 @@ interface NavbarProps {
 
 export function Navbar({ breadcrumb, actions }: NavbarProps) {
   return (
-    <nav className="sticky top-0 z-40 border-b border-border bg-bg-primary bg-opacity-90 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
-              <div
-                className="h-8 w-8 rounded-lg flex items-center justify-center"
-                style={{ background: 'var(--gold)' }}
-              >
-                <TrendingUp className="h-4 w-4" style={{ color: 'var(--bg-primary)' }} />
-              </div>
-              <span className="font-bold text-lg text-primary">Ascend</span>
+    <nav
+      className="sticky top-0 z-40 border-b"
+      style={{
+        background: 'var(--bg-primary)',
+        borderColor: 'var(--border)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    >
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="font-serif text-xl font-light tracking-wide"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Ascend
             </Link>
             {breadcrumb && (
               <>
-                <span className="text-muted">/</span>
-                <span className="text-sm text-secondary font-medium">{breadcrumb}</span>
+                <span style={{ color: 'var(--border-strong)', fontSize: 14 }}>/</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  {breadcrumb}
+                </span>
               </>
             )}
           </div>

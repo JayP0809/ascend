@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-1a]
+    branches: [main, phase-1a, ascend-frontend-rebuild]
   pull_request:
     branches: [main]
 

@@ -1,27 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { DashboardData } from '@/lib/types';
-import { CheckCircle, Circle, Lock, ChevronDown, ChevronUp, ExternalLink, Clock } from 'lucide-react';
-import { clsx } from 'clsx';
+import { CheckCircle, ChevronDown, ChevronUp, ExternalLink, Clock } from 'lucide-react';
 
 interface RoadmapTabProps {
   data: DashboardData;
 }
 
-type PhaseFilter = 'All Phases' | 'Learning' | 'Building' | 'Applying';
-const PHASE_FILTERS: PhaseFilter[] = ['All Phases', 'Learning', 'Building', 'Applying'];
-
-function getPhaseType(focusArea: string): PhaseFilter {
+function getPhaseType(focusArea: string): string {
   const fa = focusArea.toLowerCase();
   if (fa.includes('capstone') || fa.includes('prep') || fa.includes('job') || fa.includes('apply')) return 'Applying';
   if (fa.includes('project') || fa.includes('build') || fa.includes('deploy') || fa.includes('infrastructure')) return 'Building';
   return 'Learning';
 }
-
 
 export function RoadmapTab({ data }: RoadmapTabProps) {
   const { analysis } = data;
@@ -35,10 +26,11 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
     } catch { return new Set(); }
   });
   const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
-  const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('All Phases');
 
   useEffect(() => {
-    localStorage.setItem(`roadmap-complete-${analysis.analysisId}`, JSON.stringify([...completed]));
+    try {
+      localStorage.setItem(`roadmap-complete-${analysis.analysisId}`, JSON.stringify([...completed]));
+    } catch { /* storage unavailable */ }
   }, [completed, analysis.analysisId]);
 
   const toggleComplete = (i: number) => {
@@ -57,191 +49,237 @@ export function RoadmapTab({ data }: RoadmapTabProps) {
     });
   };
 
-  const filtered = roadmap.filter((phase) =>
-    phaseFilter === 'All Phases' || getPhaseType(phase.focus_area) === phaseFilter
-  );
+  const filtered = roadmap;
 
   const progressPct = roadmap.length > 0 ? Math.round((completed.size / roadmap.length) * 100) : 0;
 
-  return (
-    <div className="space-y-6">
-      {/* Progress header */}
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-sm font-semibold text-primary">
-              {completed.size} of {roadmap.length} phases complete
-            </p>
-            <p className="text-xs text-muted mt-0.5">
-              {progressPct >= 100 ? 'Roadmap complete! 🎉' : `${100 - progressPct}% remaining`}
-            </p>
-          </div>
-          <span className="text-2xl font-bold text-accent">{progressPct}%</span>
-        </div>
-        <Progress value={progressPct} />
-      </Card>
+  // First incomplete phase index (across all phases, not just filtered)
+  const nextIncompleteIndex = roadmap.findIndex((_, i) => !completed.has(i));
 
-      {/* Filter pills */}
-      <div className="flex gap-2 flex-wrap">
-        {PHASE_FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setPhaseFilter(f)}
-            className={clsx(
-              'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-              phaseFilter === f
-                ? 'bg-accent text-accent-fg'
-                : 'bg-background text-secondary hover:text-primary border border-border'
-            )}
-          >
-            {f}
-          </button>
-        ))}
+  return (
+    <div>
+      {/* Progress summary */}
+      <div className="mb-7 pb-7 border-b" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {completed.size === 0
+              ? 'No phases complete yet'
+              : completed.size === roadmap.length
+              ? 'All phases complete'
+              : `${completed.size} of ${roadmap.length} phases complete`}
+          </p>
+          <span className="font-serif text-2xl font-light" style={{ color: 'var(--text-primary)' }}>
+            {progressPct}%
+          </span>
+        </div>
+
+        {/* Thin progress bar */}
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${progressPct}%`, background: 'var(--text-primary)' }}
+          />
+        </div>
+        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+          Progress is saved in this browser only.
+        </p>
       </div>
 
-      {/* Timeline */}
-      <div className="relative">
-        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
+      {/* Phase list */}
+      <div>
+        {filtered.map((phase) => {
+          const globalIndex = roadmap.indexOf(phase);
+          const isDone = completed.has(globalIndex);
+          const isNext = globalIndex === nextIncompleteIndex;
+          const isOpen = expanded.has(globalIndex);
+          const phaseType = getPhaseType(phase.focus_area);
 
-        <div className="space-y-4">
-          {filtered.map((phase) => {
-            const globalIndex = roadmap.indexOf(phase);
-            const isDone = completed.has(globalIndex);
-            const isCurrent = !isDone && globalIndex === [...Array(roadmap.length).keys()].find((idx) => !completed.has(idx));
-            const isOpen = expanded.has(globalIndex);
-
-            return (
-              <div key={globalIndex} className="relative pl-10">
-                {/* Timeline dot */}
-                <div
-                  className={clsx(
-                    'absolute left-0 top-5 h-10 w-10 rounded-full border-2 flex items-center justify-center z-10 transition-all',
-                    isDone ? 'border-[var(--emerald)]' :
-                    isCurrent ? 'bg-card border-accent' : 'bg-card border-border'
-                  )}
-                  style={isDone ? { background: 'var(--emerald)' } : undefined}
+          return (
+            <div
+              key={globalIndex}
+              className="border-b"
+              style={{ borderColor: isOpen ? 'var(--border-strong)' : 'var(--border)' }}
+            >
+              {/* "Next up" callout */}
+              {isNext && (
+                <p
+                  className="text-xs font-medium pt-5 pb-1 uppercase tracking-widest"
+                  style={{ color: 'var(--emerald-text)' }}
                 >
+                  Next up
+                </p>
+              )}
+
+              {/* Phase header row */}
+              <button
+                className="w-full flex items-center gap-4 py-5 text-left"
+                onClick={() => toggleExpand(globalIndex)}
+                aria-expanded={isOpen}
+              >
+                {/* Completion indicator */}
+                <div className="flex-shrink-0 mt-0.5">
                   {isDone ? (
-                    <CheckCircle className="h-5 w-5" style={{ color: 'var(--bg-primary)' }} />
-                  ) : isCurrent ? (
-                    <Circle className="h-4 w-4 text-accent fill-accent" />
+                    <CheckCircle
+                      className="h-4 w-4"
+                      style={{ color: 'var(--emerald-text)' }}
+                      aria-label="Complete"
+                    />
                   ) : (
-                    <Lock className="h-4 w-4 text-muted" />
+                    <div
+                      className="h-4 w-4 rounded-full border-2"
+                      style={{
+                        borderColor: isNext ? 'var(--text-primary)' : 'var(--border)',
+                        background:  isNext ? 'var(--text-primary)' : 'transparent',
+                      }}
+                      aria-hidden="true"
+                    />
                   )}
                 </div>
 
-                <Card className={clsx('transition-all', isDone && 'opacity-75')}>
-                  {/* Phase header */}
-                  <button
-                    className="w-full flex items-center justify-between text-left"
-                    onClick={() => toggleExpand(globalIndex)}
+                {/* Phase info */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-medium leading-snug"
+                    style={{
+                      color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
+                      textDecoration: isDone ? 'line-through' : 'none',
+                    }}
                   >
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-muted">Week {phase.week_start}–{phase.week_end}</span>
-                        <Badge variant="accent">
-                          {getPhaseType(phase.focus_area)}
-                        </Badge>
-                        {isDone && <Badge variant="success">Done ✓</Badge>}
-                      </div>
-                      <p className="text-sm font-semibold text-primary mt-1">{phase.focus_area}</p>
-                    </div>
-                    {isOpen ? <ChevronUp className="h-4 w-4 text-muted flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted flex-shrink-0" />}
-                  </button>
+                    {phase.focus_area}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    Week {phase.week_start}–{phase.week_end} · {phaseType}
+                  </p>
+                </div>
 
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pt-4 space-y-4">
-                          {/* Topics */}
-                          <div>
-                            <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Topics</p>
-                            <ul className="space-y-1">
-                              {phase.topics.map((t) => (
-                                <li key={t} className="text-sm text-secondary flex items-start gap-2">
-                                  <span className="text-accent mt-1 flex-shrink-0">›</span>{t}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                {isOpen
+                  ? <ChevronUp className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                  : <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                }
+              </button>
 
-                          {/* Resources */}
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--gold)' }}>Resources</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {phase.resources.map((r) => (
-                                <a
-                                  key={r.title}
-                                  href={r.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-2.5 rounded-lg border transition-colors group"
-                                  style={{ borderColor: 'var(--gold-light)', background: 'var(--gold-light)' }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)'; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--gold-light)'; }}
-                                >
-                                  <div className="h-6 w-6 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'var(--gold-light)' }}>
-                                    <span className="text-xs font-bold" style={{ color: 'var(--gold)' }}>{r.type[0]}</span>
-                                  </div>
-                                  <span className="text-xs text-secondary group-hover:text-primary transition-colors flex-1 min-w-0 truncate">{r.title}</span>
-                                  <ExternalLink className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--gold)' }} />
-                                </a>
-                              ))}
-                            </div>
-                          </div>
+              {/* Expanded content */}
+              {isOpen && (
+                <div className="pb-7 space-y-6">
 
-                          {/* Project */}
-                          <div className="rounded-xl p-4 border" style={{ background: 'var(--emerald-light)', borderColor: 'var(--emerald)' }}>
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--emerald-text)' }}>Project</p>
-                              <div className="flex items-center gap-1 text-xs text-muted">
-                                <Clock className="h-3 w-3" />
-                                ~{phase.project.hours}h
-                              </div>
-                            </div>
-                            <p className="text-sm font-semibold text-primary mb-1">{phase.project.title}</p>
-                            <p className="text-xs text-secondary mb-2">{phase.project.description}</p>
-                            <div className="flex flex-wrap gap-1">
-                              {phase.project.tech.map((t) => (
-                                <span key={t} className="px-2 py-0.5 rounded text-xs border border-border text-secondary" style={{ background: 'var(--bg-secondary)' }}>{t}</span>
-                              ))}
-                            </div>
-                          </div>
+                  {/* Topics */}
+                  <div>
+                    <p
+                      className="text-xs uppercase tracking-widest font-medium mb-3"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Topics
+                    </p>
+                    <ul className="space-y-2">
+                      {phase.topics.map((t) => (
+                        <li key={t} className="flex items-start gap-3">
+                          <span className="mt-1.5 h-1 w-1 rounded-full flex-shrink-0" style={{ background: 'var(--text-muted)' }} aria-hidden="true" />
+                          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                          {/* Milestone */}
-                          <div className="flex items-start gap-2 text-xs text-secondary">
-                            <CheckCircle className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
-                            <span><span className="font-semibold">Milestone:</span> {phase.milestone}</span>
-                          </div>
-
-                          {/* Mark complete button */}
-                          <button
-                            onClick={() => toggleComplete(globalIndex)}
-                            className={clsx(
-                              'w-full py-2 rounded-lg text-sm font-medium transition-all border',
-                              isDone
-                                ? 'border-[var(--emerald)]'
-                                : 'bg-background text-secondary border-border hover:border-accent hover:text-accent'
-                            )}
-                            style={isDone ? { background: 'var(--emerald-light)', color: 'var(--emerald-text)' } : undefined}
+                  {/* Resources */}
+                  <div>
+                    <p
+                      className="text-xs uppercase tracking-widest font-medium mb-3"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Resources
+                    </p>
+                    <div className="space-y-2">
+                      {phase.resources.map((r) => (
+                        <a
+                          key={r.title}
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 py-2.5 px-3 rounded-xl border group transition-colors"
+                          style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border-strong)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)'; }}
+                        >
+                          <span
+                            className="text-xs font-medium flex-shrink-0 uppercase"
+                            style={{ color: 'var(--text-muted)', width: 24 }}
                           >
-                            {isDone ? '✓ Phase complete' : 'Mark as complete'}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Card>
-              </div>
-            );
-          })}
-        </div>
+                            {r.type[0]}
+                          </span>
+                          <span className="text-sm flex-1 min-w-0 truncate" style={{ color: 'var(--text-secondary)' }}>
+                            {r.title}
+                          </span>
+                          <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Project */}
+                  <div>
+                    <p
+                      className="text-xs uppercase tracking-widest font-medium mb-3"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Project
+                    </p>
+                    <div
+                      className="p-4 rounded-2xl border"
+                      style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {phase.project.title}
+                        </p>
+                        <span className="flex items-center gap-1 text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          <Clock className="h-3 w-3" aria-hidden="true" />
+                          ~{phase.project.hours}h
+                        </span>
+                      </div>
+                      <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
+                        {phase.project.description}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {phase.project.tech.map((t) => (
+                          <span
+                            key={t}
+                            className="px-2 py-0.5 rounded text-xs"
+                            style={{
+                              color: 'var(--text-secondary)',
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--border)',
+                            }}
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Milestone */}
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>Milestone</span>
+                    {': '}{phase.milestone}
+                  </p>
+
+                  {/* Complete toggle */}
+                  <button
+                    onClick={() => toggleComplete(globalIndex)}
+                    className="text-sm font-medium transition-colors"
+                    style={{
+                      color: isDone ? 'var(--emerald-text)' : 'var(--text-secondary)',
+                      textDecoration: 'underline',
+                      textUnderlineOffset: '3px',
+                    }}
+                  >
+                    {isDone ? 'Mark as incomplete' : 'Mark as complete'}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

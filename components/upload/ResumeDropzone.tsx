@@ -1,14 +1,13 @@
 'use client';
 import { useState, useCallback } from 'react';
-import { Upload, CheckCircle, FileText, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface ResumeDropzoneProps {
   onUploadComplete: (analysisId: string) => void;
-  onSampleResumePreview?: () => void;
 }
 
-export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: ResumeDropzoneProps) {
+export function ResumeDropzone({ onUploadComplete }: ResumeDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
@@ -47,12 +46,6 @@ export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: Resu
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   }, [handleFile]);
-
-  const handleSampleResume = () => {
-    if (onSampleResumePreview) {
-      onSampleResumePreview();
-    }
-  };
 
   if (uploadedFile) {
     return (
@@ -111,20 +104,6 @@ export function ResumeDropzone({ onUploadComplete, onSampleResumePreview }: Resu
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted">or</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
-
-      <button
-        onClick={handleSampleResume}
-        disabled={uploading}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border text-sm text-secondary hover:text-primary hover:bg-background transition-colors"
-      >
-        <FileText className="h-4 w-4" />
-        Try the sample resume
-      </button>
     </div>
   );
 }

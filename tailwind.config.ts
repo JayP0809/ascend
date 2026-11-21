@@ -24,6 +24,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-cormorant)', 'Georgia', 'serif'],
       },
       animation: {
         'float-up': 'floatUp 8s ease-in-out infinite',

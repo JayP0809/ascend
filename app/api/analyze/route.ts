@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAnalysis, saveCommunityEntry, claimAnalysisSlot, releaseAnalysisClaim, updateAnalysisResult } from '@/lib/db';
-import { runAnalysis, getDemoData, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
+import { runAnalysis, isLiveMode, GroqTimeoutError, GroqTruncationError, GroqValidationError, RoadmapAssemblyError } from '@/lib/ai';
+import { buildDemoAnalysis } from '@/lib/demo-samples';
 import { buildDashboardData } from '@/lib/scorer';
 import { getCurrentUser, checkAnalysisAccess, DEV_BYPASS_ACTIVE, AUTH_CONFIGURED } from '@/lib/auth';
 import { reserveQuotaSlot, refundQuotaSlot, reserveGlobalQuotaSlot, refundGlobalQuotaSlot, GLOBAL_MONTHLY_ANALYSIS_QUOTA } from '@/lib/quota';
@@ -49,9 +50,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Demo flows bypass all authentication, quota, and dedup checks.
   if (isDemoFlow) {
-    const result = getDemoData(analysisId || uuidv4(), targetRole);
-    const dashboard = buildDashboardData(result);
-    return NextResponse.json({ analysisId: result.analysisId, dashboard, isDemoMode: true });
+    const demoId = analysisId || uuidv4();
+    const demoResult = buildDemoAnalysis(demoId, targetRole);
+    if (!demoResult) {
+      return NextResponse.json(
+        { error: 'sample_unavailable', message: `A tailored sample is not available for "${targetRole}". Try a supported role or sign in to analyze your own resume.` },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ analysisId: demoResult.analysisId, dashboard: buildDashboardData(demoResult), isDemoMode: true });
   }
 
   // Live flow requires a session when Auth.js is configured OR fail-closed in production.
@@ -269,8 +276,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   if (id.startsWith('demo-')) {
-    const result = getDemoData(id);
-    return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(result), isDemoMode: true });
+    const role = searchParams.get('role') || 'DevOps Engineer';
+    const demoResult = buildDemoAnalysis(id, role);
+    if (!demoResult) {
+      return NextResponse.json(
+        { error: 'sample_unavailable', message: `A tailored sample is not available for "${role}". Try a supported role or sign in to analyze your own resume.` },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ analysisId: id, dashboard: buildDashboardData(demoResult), isDemoMode: true });
   }
 
   const record = await getAnalysis(id);

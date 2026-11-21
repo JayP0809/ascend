@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 
 /**
@@ -12,6 +11,22 @@ export default function SettingsPage() {
   const { data: session, status } = useSession();
   const [deleteState, setDeleteState] = useState<'idle' | 'confirm' | 'deleting' | 'done' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    // Clear per-analysis roadmap progress from localStorage so a subsequent
+    // account's roadmap state does not bleed across sessions on shared machines.
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('roadmap-complete-')) keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch { /* ignore: localStorage unavailable in some contexts */ }
+    await signOut({ callbackUrl: '/' });
+  }
 
   if (status === 'loading') {
     return (
@@ -111,6 +126,21 @@ export default function SettingsPage() {
               <span className="text-primary">Google</span>
             </div>
           </div>
+        </section>
+
+        {/* Sign out */}
+        <section className="bg-card border border-border rounded-xl p-6 mb-6">
+          <h2 className="text-base font-medium mb-1">Session</h2>
+          <p className="text-sm text-secondary mb-5">
+            Sign out of your account on this device. Your saved analyses and roadmap will remain intact.
+          </p>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="px-4 py-2 rounded-lg border border-border text-secondary text-sm font-medium hover:text-primary hover:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </button>
         </section>
 
         {/* Danger zone */}

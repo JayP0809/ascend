@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { parseResume, truncateText } from '@/lib/parser';
 import { saveAnalysis } from '@/lib/db';
 import { isLiveMode } from '@/lib/ai';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, DEV_BYPASS_ACTIVE } from '@/lib/auth';
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -33,6 +33,15 @@ function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Live mode: require authentication before reading any file data.
+  const user = await getCurrentUser(request);
+  if (isLiveMode() && !DEV_BYPASS_ACTIVE && !user) {
+    return NextResponse.json(
+      { error: 'Sign in to upload your resume.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('resume') as File | null;
@@ -93,12 +102,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const analysisId = uuidv4();
     const truncated  = truncateText(resumeText, 8000);
 
-    // Bind to the authenticated user immediately if available.
-    // This establishes ownership at upload time so /api/analyze and /api/export
+    // Save resume text and bind to the authenticated user.
+    // Ownership is established at upload time so /api/analyze and /api/export
     // can enforce IDOR checks without relying on a later binding step.
-    const user = await getCurrentUser(request);
-
-    // Save resume text: empty result_json placeholder, will be filled by /api/analyze
     await saveAnalysis(analysisId, truncated, '', null, 0, '{}', { userId: user?.userId });
 
     return NextResponse.json({

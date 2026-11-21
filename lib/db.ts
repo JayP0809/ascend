@@ -161,6 +161,7 @@ export async function updateAnalysisResult(
 ): Promise<void> {
   const db = getDbClient();
   if (!db) return;
+  if (!userId) return;
 
   // Try the new path (with status column) first; fall back if not migrated.
   try {
@@ -175,6 +176,7 @@ export async function updateAnalysisResult(
              status             = 'complete',
              processing_started_at = NULL
        WHERE id = ${id}::uuid
+         AND user_id = ${userId}::uuid
     `);
   } catch {
     // Pre-migration fallback: update without the status columns.
@@ -185,7 +187,7 @@ export async function updateAnalysisResult(
       readinessScore,
       resultJson,
       isDemoMode: false,
-    }).where(and(eq(analyses.id, id), userId ? eq(analyses.userId, userId) : sql`true`));
+    }).where(and(eq(analyses.id, id), eq(analyses.userId, userId)));
   }
 }
 
@@ -217,17 +219,39 @@ export async function getUserAnalyses(
   const db = getDbClient();
   if (!db) return [];
 
-  return db
-    .select({
-      id:             analyses.id,
-      target_role:    analyses.targetRole,
-      readiness_score: analyses.readinessScore,
-      created_at:     analyses.createdAt,
-    })
-    .from(analyses)
-    .where(eq(analyses.userId, userId))
-    .orderBy(desc(analyses.createdAt))
-    .limit(limit);
+  // Only return completed analyses. Pending/processing/failed rows have
+  // result_json = '{}' and would show "Analysis not found" in the dashboard.
+  //
+  // Try the status-column path first (migration 0002 and later). Fall back to
+  // filtering on result_json for pre-migration environments where the column
+  // may not yet exist.
+  try {
+    return await db
+      .select({
+        id:              analyses.id,
+        target_role:     analyses.targetRole,
+        readiness_score: analyses.readinessScore,
+        created_at:      analyses.createdAt,
+      })
+      .from(analyses)
+      .where(and(eq(analyses.userId, userId), eq(analyses.status, 'complete')))
+      .orderBy(desc(analyses.createdAt))
+      .limit(limit);
+  } catch {
+    // Pre-migration fallback: status column not yet present; filter by
+    // result_json instead so callers still get only completed analyses.
+    return db
+      .select({
+        id:              analyses.id,
+        target_role:     analyses.targetRole,
+        readiness_score: analyses.readinessScore,
+        created_at:      analyses.createdAt,
+      })
+      .from(analyses)
+      .where(and(eq(analyses.userId, userId), sql`result_json != '{}'`))
+      .orderBy(desc(analyses.createdAt))
+      .limit(limit);
+  }
 }
 
 export async function deleteUserAnalyses(userId: string): Promise<void> {
@@ -235,6 +259,32 @@ export async function deleteUserAnalyses(userId: string): Promise<void> {
   if (!db) return;
 
   await db.delete(analyses).where(eq(analyses.userId, userId));
+}
+
+/**
+ * Deletes a single analysis owned by the specified user.
+ *
+ * The WHERE clause enforces both identity and ownership atomically, so a
+ * caller cannot delete another user's analysis even if they know its ID.
+ *
+ * Returns true when a row was deleted, false when no row matched (not found
+ * or wrong user). Throws when the database operation itself fails so callers
+ * can distinguish a genuine failure from a simple "not found".
+ *
+ * Child tables (skill_records, roadmap_phases, ai_usage) cascade-delete via
+ * their FK constraints. The community table uses SET NULL so anonymized
+ * aggregate entries are retained as designed.
+ */
+export async function deleteAnalysis(id: string, userId: string): Promise<boolean> {
+  const db = getDbClient();
+  if (!db) return false;
+
+  const result = await db
+    .delete(analyses)
+    .where(and(eq(analyses.id, id), eq(analyses.userId, userId)))
+    .returning({ id: analyses.id });
+
+  return result.length > 0;
 }
 
 // ---------------------------------------------------------------------------

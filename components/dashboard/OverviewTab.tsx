@@ -1,156 +1,269 @@
 'use client';
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { ReadinessGauge } from '@/components/charts/ReadinessGauge';
-import { SkillGapChart } from '@/components/charts/SkillGapChart';
 import { DashboardData } from '@/lib/types';
-import { getReadinessColor } from '@/lib/scorer';
-import { Clock, Zap, Target, BookOpen } from 'lucide-react';
 
 interface OverviewTabProps {
   data: DashboardData;
 }
 
-const SKILL_CATEGORIES = ['All', 'Technical', 'Soft Skills', 'Tools'] as const;
-type CategoryFilter = typeof SKILL_CATEGORIES[number];
+function readinessNote(score: number): string {
+  if (score >= 75) return 'Strong foundation. Focus on the remaining gaps to close the distance to this role.';
+  if (score >= 50) return 'Solid foundation with meaningful gaps to address before this transition is realistic.';
+  return 'Significant development work ahead. The roadmap below outlines a clear path forward.';
+}
 
-function StatCard({ icon: Icon, label, value, sub, color }: {
-  icon: React.ElementType; label: string; value: string; sub?: string; color?: string;
-}) {
+interface StatCellProps {
+  label: string;
+  value: string;
+  sub?: string;
+}
+
+function StatCell({ label, value, sub }: StatCellProps) {
   return (
-    <Card>
-      <div className="flex items-start justify-between mb-3">
-        <div className="h-10 w-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-secondary)' }}>
-          <Icon className="h-5 w-5 text-muted" />
-        </div>
-      </div>
-      <p className="text-xs text-muted mb-1">{label}</p>
-      <p className="text-2xl font-bold" style={{ color: color || 'var(--text-primary)' }}>{value}</p>
-      {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
-    </Card>
+    <div
+      style={{
+        background: 'var(--bg-secondary)',
+        padding: '20px 20px',
+      }}
+    >
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontFamily: 'var(--serif)',
+          fontSize: 'clamp(1.4rem, 3vw, 1.75rem)',
+          fontWeight: 400,
+          lineHeight: 1.1,
+          color: 'var(--text-primary)',
+          marginBottom: sub ? 4 : 0,
+        }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</p>
+      )}
+    </div>
   );
 }
 
+const SKILL_FILTER_LABELS: Record<string, string> = {
+  all: 'All', technical: 'Technical', soft: 'Soft Skills', tools: 'Tools',
+};
+const SKILL_FILTER_KEYS = ['all', 'technical', 'soft', 'tools'] as const;
+type SkillFilter = (typeof SKILL_FILTER_KEYS)[number];
+
 export function OverviewTab({ data }: OverviewTabProps) {
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
   const { analysis, skillGapItems } = data;
-  const { gapAnalysis, roleRequirements, skillExtraction, roadmap } = analysis;
+  const { gapAnalysis, roleRequirements, roadmap } = analysis;
+  const [skillFilter, setSkillFilter] = useState<SkillFilter>('all');
+
+  const ownedSkills = skillGapItems.filter((s) => s.importance === 'has');
+  const filteredSkills =
+    skillFilter === 'all'
+      ? ownedSkills
+      : ownedSkills.filter((s) => s.category === skillFilter);
 
   const totalRequired = roleRequirements.required_skills.length;
   const matched = totalRequired - gapAnalysis.missing_critical.length;
   const estMonths = Math.ceil(roadmap.length > 0 ? roadmap[roadmap.length - 1].week_end / 4 : 4);
-
-  const currentSkills = skillGapItems.filter((s) => s.importance === 'has' || s.importance === 'transferable');
-  const filteredSkills = categoryFilter === 'All'
-    ? currentSkills
-    : currentSkills.filter((s) => {
-        if (categoryFilter === 'Technical') return s.category === 'technical';
-        if (categoryFilter === 'Soft Skills') return s.category === 'soft';
-        if (categoryFilter === 'Tools') return s.category === 'tools';
-        return true;
-      });
-
-  const scoreColor = getReadinessColor(gapAnalysis.readiness_score);
+  const score = gapAnalysis.readiness_score;
 
   return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={Target}
-          label="Job Readiness"
-          value={`${gapAnalysis.readiness_score}%`}
-          sub={gapAnalysis.readiness_score >= 75 ? 'Strong candidate' : gapAnalysis.readiness_score >= 50 ? 'Good foundation' : 'Work to do'}
-          color={scoreColor}
-        />
-        <StatCard
-          icon={Zap}
-          label="Skills Matched"
-          value={`${matched} / ${totalRequired}`}
-          sub="of required skills"
-        />
-        <StatCard
-          icon={BookOpen}
-          label="Skills to Learn"
-          value={`${gapAnalysis.missing_critical.length}`}
-          sub="critical gaps"
-        />
-        <StatCard
-          icon={Clock}
-          label="Est. Time to Ready"
-          value={`${estMonths} months`}
-          sub="following the roadmap"
-        />
-      </div>
-
-      {/* Gauge + Skill cloud */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="flex flex-col items-center justify-center min-h-[260px] pb-4">
-          <ReadinessGauge score={gapAnalysis.readiness_score} targetRole={analysis.targetRole} />
-          <p className="text-[11px] text-muted text-center px-5 leading-relaxed mt-1">
+    <div>
+      {/* Score + Stats group */}
+      <div className="space-y-2">
+        {/* Score container */}
+        <div
+          style={{
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: 24,
+            padding: 'clamp(32px, 6vw, 56px) 32px',
+            textAlign: 'center',
+          }}
+        >
+          <div aria-label={`Career readiness score: ${score} out of 100`}>
+            <span
+              style={{
+                fontFamily: 'var(--serif)',
+                fontSize: 'clamp(72px, 14vw, 100px)',
+                fontWeight: 400,
+                letterSpacing: '-0.03em',
+                lineHeight: 1,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {score}
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--serif)',
+                fontSize: '1.75rem',
+                fontWeight: 400,
+                color: 'var(--text-muted)',
+              }}
+            >
+              /100
+            </span>
+          </div>
+          <p style={{ fontSize: 13, marginTop: 10, color: 'var(--text-secondary)' }}>
+            Career readiness
+          </p>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              maxWidth: 380,
+              margin: '8px auto 0',
+              lineHeight: 1.5,
+            }}
+          >
+            {readinessNote(score)}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              maxWidth: 400,
+              margin: '12px auto 0',
+              lineHeight: 1.5,
+            }}
+          >
             AI-generated heuristic estimate based on resume vs. role requirements. Not a statistical probability.
           </p>
-        </Card>
+        </div>
 
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-primary">Your current skills</h3>
-            <div className="flex gap-1 flex-wrap">
-              {SKILL_CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setCategoryFilter(cat)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    categoryFilter === cat
-                      ? 'bg-accent text-accent-fg'
-                      : 'bg-background text-secondary hover:text-primary'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {filteredSkills.length === 0 ? (
-              <p className="text-sm text-muted">No skills in this category found on your resume.</p>
-            ) : (
-              filteredSkills.map((skill) => (
-                <span
-                  key={skill.name}
-                  className="px-2.5 py-1 rounded-md text-xs font-medium border border-border text-secondary"
-                  style={{ background: 'var(--bg-secondary)' }}
-                >
-                  {skill.name}
-                </span>
-              ))
-            )}
-          </div>
-          {skillExtraction.strengths.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-xs font-medium text-muted mb-2">Key strengths</p>
-              <div className="space-y-1">
-                {skillExtraction.strengths.slice(0, 3).map((s) => (
-                  <p key={s} className="text-xs text-secondary flex items-start gap-1.5">
-                    <span className="text-muted mt-0.5">•</span>{s}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
+        {/* Stats container: gap trick creates the column dividers automatically */}
+        <div
+          className="grid grid-cols-2 sm:grid-cols-4"
+          style={{
+            background: 'var(--border)',
+            border: '1px solid var(--border)',
+            borderRadius: 20,
+            overflow: 'hidden',
+            gap: 1,
+          }}
+        >
+          <StatCell
+            label="Job Readiness"
+            value={`${score}%`}
+            sub={score >= 75 ? 'Strong candidate' : score >= 50 ? 'Good foundation' : 'Work to do'}
+          />
+          <StatCell
+            label="Skills Matched"
+            value={`${matched} / ${totalRequired}`}
+            sub="of required skills"
+          />
+          <StatCell
+            label="Skills to Learn"
+            value={`${gapAnalysis.missing_critical.length}`}
+            sub="critical gaps"
+          />
+          <StatCell
+            label="Est. Time to Ready"
+            value={`${estMonths} months`}
+            sub="following the roadmap"
+          />
+        </div>
       </div>
 
-      {/* Skill gap bar chart */}
-      <Card>
-        <h3 className="text-sm font-semibold text-primary mb-4">Skills by category</h3>
-        <div
-          role="img"
-          aria-label="Grouped bar chart: skills you currently have vs. skills the role requires, broken down by Technical, Soft Skills, Tools, and Certifications"
-        >
-          <SkillGapChart categories={roleRequirements.categories} currentSkills={skillExtraction.current_skills} />
+      {/* Your Current Skills (below stats, no card wrapper) */}
+      {ownedSkills.length > 0 && (
+        <div style={{ marginTop: 40 }}>
+          {/* Section heading */}
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.09em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              margin: '0 0 16px',
+            }}
+          >
+            Your Current Skills
+          </p>
+
+          {/* Category filter buttons */}
+          <div
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}
+            role="group"
+            aria-label="Filter skills by category"
+          >
+            {SKILL_FILTER_KEYS.map((key) => {
+              const isActive = skillFilter === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSkillFilter(key)}
+                  aria-pressed={isActive}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    padding: '6px 16px',
+                    borderRadius: 4,
+                    border: '1px solid',
+                    borderColor: isActive ? 'var(--accent)' : 'var(--border-strong)',
+                    background: isActive ? 'var(--accent)' : 'transparent',
+                    color: isActive ? 'var(--accent-fg)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'background 0.1s, color 0.1s, border-color 0.1s',
+                  }}
+                >
+                  {SKILL_FILTER_LABELS[key]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Skill tags */}
+          <div
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}
+            aria-live="polite"
+            aria-label="Filtered skills list"
+          >
+            {filteredSkills.map((skill) => (
+              <span
+                key={skill.name}
+                style={{
+                  fontSize: 13,
+                  padding: '5px 12px',
+                  borderRadius: 4,
+                  background: 'var(--sl-has-bg)',
+                  color: 'var(--sl-has-fg)',
+                  border: '1px solid rgba(40, 92, 59, 0.18)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {skill.name}
+              </span>
+            ))}
+            {filteredSkills.length === 0 && (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
+                No skills in this category.
+              </p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div
+            style={{ height: 1, background: 'var(--border)' }}
+            role="separator"
+            aria-hidden="true"
+          />
         </div>
-      </Card>
+      )}
     </div>
   );
 }
